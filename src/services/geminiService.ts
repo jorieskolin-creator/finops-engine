@@ -5,7 +5,7 @@ import { knowledgeBaseService, BATCH_DEFINITIONS } from "../knowledge_base";
 import { DiagnosticResult, Phase1AuditLogs, Phase2Validation, AuditItem, EvidenceQuote } from "../types";
 import { generateSafetyAuditPrompt } from "./securityService";
 import { validatePhase1Output, validatePhase3Grounding } from "./validatorService";
-import { MODEL_PHASE1, MODEL_PHASE3 } from "../models";
+import { MODEL_PHASE1, MODEL_PHASE3, GeminiThinkingConfig } from "../models";
 
 const ALL_CRITERIA_IDS = [
   'A1', 'A2', 'A3', 'A4', 'A5',
@@ -31,11 +31,16 @@ const parseAiResponse = (text: string): any => {
   }
 };
 
-const callGeminiGenerate = async (model: string, contents: any[], systemInstruction?: string) => {
+const callGeminiGenerate = async (
+  model: string,
+  contents: any[],
+  systemInstruction?: string,
+  thinkingConfig?: GeminiThinkingConfig
+) => {
   const response = await fetch('/api/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, contents, systemInstruction })
+    body: JSON.stringify({ model, contents, systemInstruction, thinkingConfig })
   });
 
   if (!response.ok) {
@@ -183,8 +188,10 @@ export const analyzeDocument = async (
     const dlpPrompt = generateSafetyAuditPrompt(text);
 
     const dlpResponse = await callGeminiGenerate(
-      MODEL_PHASE1,
-      [{ role: 'user', parts: [{ text: dlpPrompt }] }]
+      MODEL_PHASE1.id,
+      [{ role: 'user', parts: [{ text: dlpPrompt }] }],
+      undefined,
+      MODEL_PHASE1.thinkingConfig
     );
     const dlpResult = parseAiResponse(dlpResponse.text);
 
@@ -227,8 +234,8 @@ export const analyzeDocument = async (
           timestamp: new Date().toISOString(),
           engine_version: "finops-1.0.0",
           model_config: {
-            phase0_phase1: MODEL_PHASE1,
-            phase3: MODEL_PHASE3,
+            phase0_phase1: MODEL_PHASE1.id,
+            phase3: MODEL_PHASE3.id,
             validators: "deterministic"
           }
         },
@@ -267,7 +274,7 @@ ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}
 `;
 
     const strategyResponse = await callGeminiGenerate(
-      MODEL_PHASE3,
+      MODEL_PHASE3.id,
       [
         {
           role: 'user',
@@ -279,7 +286,8 @@ ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}
           ]
         }
       ],
-      STRATEGY_SYSTEM_INSTRUCTION
+      STRATEGY_SYSTEM_INSTRUCTION,
+      MODEL_PHASE3.thinkingConfig
     );
 
     onProgress('strategy', 90);
@@ -298,8 +306,8 @@ ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}
         timestamp: new Date().toISOString(),
         engine_version: "finops-1.0.0",
         model_config: {
-          phase0_phase1: MODEL_PHASE1,
-          phase3: MODEL_PHASE3,
+          phase0_phase1: MODEL_PHASE1.id,
+          phase3: MODEL_PHASE3.id,
           validators: "deterministic"
         }
       },

@@ -1,7 +1,7 @@
 
 import { generateBatchSystemInstruction, generateBatchUserPrompt } from './prompts';
 import { BATCH_DEFINITIONS } from './knowledge_base';
-import { MODEL_PHASE1 } from './models';
+import { MODEL_PHASE1, GeminiThinkingConfig } from './models';
 
 const parseAiResponse = (text: string): any => {
   if (!text) return {};
@@ -21,7 +21,12 @@ const parseAiResponse = (text: string): any => {
   }
 };
 
-const callGeminiGenerate = async (model: string, contents: any[], systemInstruction: string) => {
+const callGeminiGenerate = async (
+  model: string,
+  contents: any[],
+  systemInstruction: string,
+  thinkingConfig?: GeminiThinkingConfig
+) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 595000);
 
@@ -29,7 +34,7 @@ const callGeminiGenerate = async (model: string, contents: any[], systemInstruct
     const response = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, contents, systemInstruction }),
+      body: JSON.stringify({ model, contents, systemInstruction, thinkingConfig }),
       signal: controller.signal
     });
 
@@ -66,7 +71,7 @@ export const runPhase1Audit = async (text: string, onProgress: (completed: numbe
       const userPrompt = generateBatchUserPrompt(batchId, definitions);
 
       const response = await callGeminiGenerate(
-        MODEL_PHASE1,
+        MODEL_PHASE1.id,
         [
           {
             role: 'user',
@@ -76,7 +81,8 @@ export const runPhase1Audit = async (text: string, onProgress: (completed: numbe
             ]
           }
         ],
-        systemInstruction
+        systemInstruction,
+        MODEL_PHASE1.thinkingConfig
       );
 
       try {

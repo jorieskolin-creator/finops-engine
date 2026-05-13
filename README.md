@@ -31,14 +31,16 @@ Secrets are **not** inlined into the client bundle — `vite.config.ts` only exp
 
 ### Model configuration
 
-Model IDs are centralized in `src/models.ts`. During technical testing the engine uses Gemini only:
+Model IDs **and thinking config** are centralized in `src/models.ts` as `ModelProfile` objects. During technical testing the engine uses Gemini only:
 
-| Phase | Model constant | Default ID |
-|-------|---------------|------------|
-| Phase 0 (DLP) + Phase 1 (5 parallel batch audits) | `MODEL_PHASE1` | `gemini-2.5-flash` |
-| Phase 3 (strategy synthesis) | `MODEL_PHASE3` | `gemini-2.5-pro` |
+| Phase | Constant | Model ID | Thinking config |
+|-------|----------|----------|-----------------|
+| Phase 0 (DLP) + Phase 1 (5 parallel batch audits) | `MODEL_PHASE1` | `gemini-3-flash-preview` | `{ thinkingLevel: 'low' }` |
+| Phase 3 (strategy synthesis) | `MODEL_PHASE3` | `gemini-2.5-pro` | `{ thinkingBudget: -1 }` (dynamic) |
 
-The Anthropic path (`src/services/anthropicService.ts`, `api/anthropic-generate.js`) is left in the codebase but is not wired into the pipeline right now. Re-enable by swapping `MODEL_PHASE3` back to `callOpusStrategy` in `src/services/geminiService.ts` and adding `ANTHROPIC_API_KEY` to the platform env vars.
+Gemini 3 uses `thinkingLevel` (`'low' | 'medium' | 'high'`); Gemini 2.5 uses `thinkingBudget` (integer; `-1` dynamic, `0` off-Flash-only). The two cannot be combined in one request. The `thinkingConfig` object is plumbed from `src/models.ts` → `callGeminiGenerate` → `/api/generate` → the SDK's `generateContent({ config: { thinkingConfig } })`.
+
+The Anthropic path (`src/services/anthropicService.ts`, `api/anthropic-generate.js`) is left dormant. Re-enable by swapping the Phase 3 call in `src/services/geminiService.ts` back to `callOpusStrategy` and adding `ANTHROPIC_API_KEY` to the platform env vars.
 
 ## Deployment (Railway)
 

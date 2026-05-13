@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { model, contents, systemInstruction } = req.body;
+    const { model, contents, systemInstruction, thinkingConfig } = req.body;
 
     if (!model || !contents) {
       return res.status(400).json({ error: 'Missing required fields: model, contents' });
@@ -19,13 +19,16 @@ export default async function handler(req, res) {
 
     const ai = new GoogleGenAI({ apiKey });
 
+    const config = {
+      systemInstruction: systemInstruction,
+      responseMimeType: "application/json",
+      ...(thinkingConfig ? { thinkingConfig } : {})
+    };
+
     const response = await ai.models.generateContent({
       model: model,
       contents: contents,
-      config: {
-        systemInstruction: systemInstruction,
-        responseMimeType: "application/json"
-      }
+      config
     });
 
     return res.status(200).json({ text: response.text });
