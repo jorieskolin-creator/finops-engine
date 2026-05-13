@@ -5,8 +5,7 @@ import { knowledgeBaseService, BATCH_DEFINITIONS } from "../knowledge_base";
 import { DiagnosticResult, Phase1AuditLogs, Phase2Validation, AuditItem, EvidenceQuote } from "../types";
 import { generateSafetyAuditPrompt } from "./securityService";
 import { validatePhase1Output, validatePhase3Grounding } from "./validatorService";
-import { callOpusStrategy } from "./anthropicService";
-import { GoogleGenAI } from "@google/genai";
+import { MODEL_PHASE1, MODEL_PHASE3, GeminiThinkingConfig } from "../models";
 
 const ALL_CRITERIA_IDS = [
   'A1', 'A2', 'A3', 'A4', 'A5',
@@ -32,41 +31,19 @@ const parseAiResponse = (text: string): any => {
   }
 };
 
-const callGeminiGenerate = async (model: string, contents: any[], systemInstruction?: string) => {
-  const isDev = (import.meta as any)?.env?.DEV;
-
-  if (isDev || !window.location.host.includes('vercel.app')) {
-    if (!process.env.API_KEY) {
-      throw new Error("API Key missing in environment. Please check .env file.");
-    }
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: contents,
-      config: {
-        systemInstruction: systemInstruction,
-        responseMimeType: "application/json"
-      }
-    });
-    return { text: response.text };
-  }
-
+const callGeminiGenerate = async (
+  model: string,
+  contents: any[],
+  systemInstruction?: string,
+  thinkingConfig?: GeminiThinkingConfig
+) => {
   const response = await fetch('/api/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model, contents, systemInstruction })
+    body: JSON.stringify({ model, contents, systemInstruction, thinkingConfig })
   });
 
   if (!response.ok) {
-    if (response.status === 404) {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const fallbackResponse = await ai.models.generateContent({
-        model: model,
-        contents: contents,
-        config: { systemInstruction: systemInstruction, responseMimeType: "application/json" }
-      });
-      return { text: fallbackResponse.text };
-    }
     throw new Error(`Proxy Error: ${response.statusText}`);
   }
 
@@ -211,8 +188,10 @@ export const analyzeDocument = async (
     const dlpPrompt = generateSafetyAuditPrompt(text);
 
     const dlpResponse = await callGeminiGenerate(
-      'gemini-2.5-pro-preview-05-06',
-      [{ role: 'user', parts: [{ text: dlpPrompt }] }]
+      MODEL_PHASE1.id,
+      [{ role: 'user', parts: [{ text: dlpPrompt }] }],
+      undefined,
+      MODEL_PHASE1.thinkingConfig
     );
     const dlpResult = parseAiResponse(dlpResponse.text);
 
@@ -255,8 +234,8 @@ export const analyzeDocument = async (
           timestamp: new Date().toISOString(),
           engine_version: "finops-1.0.0",
           model_config: {
-            phase0_phase1: "gemini-2.5-pro-preview-05-06",
-            phase3: "claude-opus-4-7",
+            phase0_phase1: MODEL_PHASE1.id,
+            phase3: MODEL_PHASE3.id,
             validators: "deterministic"
           }
         },
@@ -294,19 +273,21 @@ CATEGORY BREAKDOWN:
 ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}: ${score}/15`).join('\n')}
 `;
 
-    const strategyResponse = await callOpusStrategy(
+    const strategyResponse = await callGeminiGenerate(
+      MODEL_PHASE3.id,
       [
         {
-          role: "user",
-          content: [
-            { type: "text", text: STRATEGY_USER_PROMPT },
-            { type: "text", text: `\n\n### THE GOLDEN STANDARD (SSOT)\nYou must ignore generic internet advice. You may ONLY prescribe solutions found in this Knowledge Base:\n\n${fullSSOT}` },
-            { type: "text", text: `\n\n### DIAGNOSTIC FINDINGS (Phase 1 & 2)\nUse these specific gaps and anti-patterns to trigger the strategies above:\n${handoffSummary}` },
-            { type: "text", text: `\n\n### ORIGINAL SOURCE CONTEXT\n<SOURCE_DOCUMENT_TO_AUDIT>\n${text.substring(0, 50000)}\n</SOURCE_DOCUMENT_TO_AUDIT>` }
+          role: 'user',
+          parts: [
+            { text: STRATEGY_USER_PROMPT },
+            { text: `\n\n### THE GOLDEN STANDARD (SSOT)\nYou must ignore generic internet advice. You may ONLY prescribe solutions found in this Knowledge Base:\n\n${fullSSOT}` },
+            { text: `\n\n### DIAGNOSTIC FINDINGS (Phase 1 & 2)\nUse these specific gaps and anti-patterns to trigger the strategies above:\n${handoffSummary}` },
+            { text: `\n\n### ORIGINAL SOURCE CONTEXT\n<SOURCE_DOCUMENT_TO_AUDIT>\n${text.substring(0, 50000)}\n</SOURCE_DOCUMENT_TO_AUDIT>` }
           ]
         }
       ],
-      STRATEGY_SYSTEM_INSTRUCTION
+      STRATEGY_SYSTEM_INSTRUCTION,
+      MODEL_PHASE3.thinkingConfig
     );
 
     onProgress('strategy', 90);
@@ -325,8 +306,8 @@ ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}
         timestamp: new Date().toISOString(),
         engine_version: "finops-1.0.0",
         model_config: {
-          phase0_phase1: "gemini-2.5-pro-preview-05-06",
-          phase3: "claude-opus-4-7",
+          phase0_phase1: MODEL_PHASE1.id,
+          phase3: MODEL_PHASE3.id,
           validators: "deterministic"
         }
       },

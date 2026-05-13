@@ -8,6 +8,18 @@ import { PerformanceMonitor } from './services/debugService';
 import { DiagnosticResult, ScanResult } from './types';
 import { GaugeCard, AuditGrid, StrategicRoadmap, ComparisonChart, ReferenceLibrary, SignalWarningBanner, BenchmarkingChart, TransferProtocol, MarkdownRenderer, NeuralLoadingGrid } from './components/DashboardComponents';
 import { ReportView } from './components/ReportView';
+import { LoginModal } from './components/LoginModal';
+import { checkSession, logout } from './services/authService';
+import goldenCrawl from '../test/golden-crawl.txt?raw';
+import goldenWalk from '../test/golden-walk.txt?raw';
+import goldenRun from '../test/golden-run.txt?raw';
+
+const DRIFT_FIXTURES = [
+  { name: 'golden-crawl.txt', text: goldenCrawl },
+  { name: 'golden-walk.txt', text: goldenWalk },
+  { name: 'golden-run.txt', text: goldenRun },
+];
+const DRIFT_LABEL = 'Drift Test — Combined Golden Fixtures';
 
 interface UploadedFile {
   id: string;
@@ -65,7 +77,15 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'audit' | 'strategy' | 'reference'>('overview');
   const [viewMode, setViewMode] = useState<'dashboard' | 'report'>('dashboard');
   const [scanResult, setScanResult] = useState<ScanResult>({ score: 0, status: 'Insufficient', message: 'Waiting...', details: [], canRun: false });
+  const [authenticated, setAuthenticated] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const pendingAnalyzeRef = useRef(false);
+  const pendingDriftRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    checkSession().then(setAuthenticated);
+  }, []);
 
   const MIN_FILES = 2;
   const MAX_FILES = 12;
@@ -178,20 +198,22 @@ const App: React.FC = () => {
 
   const removeFile = (id: string) => setFiles(files.filter(f => f.id !== id));
 
-  const handleAnalyze = async () => {
-    if (!aggregatedText || !scanResult.canRun) return;
+  const runAnalyze = async (opts?: { textOverride?: string; label?: string }) => {
     setLoading(true);
     setLoadingStage('audit');
     setAuditProgress(0);
     setError(null);
     PerformanceMonitor.start('FullAnalysis');
     try {
-      const safeText = sanitizeInput(aggregatedText);
+      const safeText = opts?.textOverride ?? sanitizeInput(aggregatedText);
       const data = await analyzeDocument(safeText, (stage, progress) => {
         setLoadingStage(stage);
         if (progress !== undefined) setAuditProgress(progress);
       });
       if (!data.phase_2_validation?.metrics) throw new Error("Analysis returned incomplete data.");
+      if (opts?.label) {
+        data.meta = { ...data.meta, document_analyzed: opts.label };
+      }
       setResult(data);
     } catch (e: any) {
       setError(e.message || "Analysis failed.");
@@ -200,6 +222,33 @@ const App: React.FC = () => {
       setLoadingStage(null);
       PerformanceMonitor.end('FullAnalysis');
     }
+  };
+
+  const startDriftTest = () => {
+    const combined = DRIFT_FIXTURES
+      .map(f => `\n<DOCUMENT name="${f.name}">\n${f.text}\n</DOCUMENT>\n`)
+      .join('\n');
+    runAnalyze({ textOverride: sanitizeInput(combined), label: DRIFT_LABEL });
+  };
+
+  const handleAnalyze = async () => {
+    if (!aggregatedText || !scanResult.canRun) return;
+    if (!authenticated) {
+      pendingAnalyzeRef.current = true;
+      setShowLogin(true);
+      return;
+    }
+    await runAnalyze();
+  };
+
+  const handleDriftTest = () => {
+    if (loading) return;
+    if (!authenticated) {
+      pendingDriftRef.current = true;
+      setShowLogin(true);
+      return;
+    }
+    startDriftTest();
   };
 
   const reset = () => {
@@ -241,9 +290,40 @@ const App: React.FC = () => {
               <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">System Online</span>
             </div>
 
+            <button
+              onClick={async () => {
+                if (authenticated) {
+                  await logout();
+                  setAuthenticated(false);
+                } else {
+                  pendingAnalyzeRef.current = false;
+                  setShowLogin(true);
+                }
+              }}
+              className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                authenticated
+                  ? 'bg-emerald-950/30 border-emerald-900/50 text-emerald-400 hover:text-white hover:border-emerald-500'
+                  : 'bg-slate-900/50 border-slate-700 text-slate-400 hover:text-white hover:border-amber-500'
+              }`}
+              title={authenticated ? 'Click to log out' : 'Click to log in'}
+            >
+              <span>{authenticated ? '🔓' : '🔒'}</span>
+              <span>{authenticated ? 'Unlocked' : 'Locked'}</span>
+            </button>
+
             {!result && (
               <button onClick={() => setActiveTab(activeTab === 'reference' ? 'overview' : 'reference')} className="text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-white transition-colors px-4 py-2 rounded-lg hover:bg-white/5">
                 {activeTab === 'reference' ? 'Close Reference' : 'View Criteria'}
+              </button>
+            )}
+
+            {authenticated && !loading && !result && (
+              <button
+                onClick={handleDriftTest}
+                className="text-xs font-bold uppercase tracking-widest text-amber-300 hover:text-white bg-amber-950/30 hover:bg-amber-700/40 border border-amber-700/40 hover:border-amber-400 transition-colors px-4 py-2 rounded-lg"
+                title="Run the assessment against the bundled golden fixtures (crawl + walk + run combined)"
+              >
+                Drift Test
               </button>
             )}
 
@@ -497,6 +577,26 @@ const App: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      <LoginModal
+        open={showLogin}
+        onClose={() => {
+          setShowLogin(false);
+          pendingAnalyzeRef.current = false;
+          pendingDriftRef.current = false;
+        }}
+        onSuccess={() => {
+          setShowLogin(false);
+          setAuthenticated(true);
+          if (pendingAnalyzeRef.current) {
+            pendingAnalyzeRef.current = false;
+            runAnalyze();
+          } else if (pendingDriftRef.current) {
+            pendingDriftRef.current = false;
+            startDriftTest();
+          }
+        }}
+      />
     </div>
   );
 };
