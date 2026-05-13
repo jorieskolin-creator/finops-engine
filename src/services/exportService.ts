@@ -1,5 +1,64 @@
 
-import { DiagnosticResult } from '../types';
+import { AuditItem, DiagnosticResult } from '../types';
+import { BATCH_TITLES, MASTER_BINGO_FINOPS } from '../knowledge_base';
+
+const BATCHES: Array<'A' | 'B' | 'C' | 'D' | 'E'> = ['A', 'B', 'C', 'D', 'E'];
+
+const escapeHtml = (s: string): string =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const statusBadgeClass = (status: string): string => {
+  if (status === 'OK') return 'badge-ok';
+  if (status === 'NOK') return 'badge-nok';
+  if (status === 'Partial') return 'badge-partial';
+  return 'badge-none';
+};
+
+const renderForensicCriterion = (cat: { id: string; title: string; desc: string }, item: AuditItem | undefined): string => `
+    <div class="forensic-card">
+      <div class="forensic-head">
+        <div>
+          <span class="forensic-id">${escapeHtml(cat.id)}</span>
+          <h4>${escapeHtml(cat.title)}</h4>
+        </div>
+        <span class="badge ${statusBadgeClass(item?.status ?? '')}">${escapeHtml(item?.status ?? 'No Data')}</span>
+      </div>
+      <p class="forensic-desc">${escapeHtml(cat.desc)}</p>
+      ${item?.reasoning ? `
+      <div class="forensic-block">
+        <div class="forensic-label">AI Reasoning</div>
+        <p class="forensic-reasoning">${escapeHtml(item.reasoning)}</p>
+      </div>` : ''}
+      ${item?.evidence_quotes && item.evidence_quotes.length > 0 ? `
+      <div class="forensic-block">
+        <div class="forensic-label">Evidence</div>
+        <ul class="forensic-quotes">
+          ${item.evidence_quotes.map(q => `
+            <li>&ldquo;${escapeHtml(q.quote)}&rdquo;${q.section ? `<span class="forensic-section"> — ${escapeHtml(q.section)}</span>` : ''}</li>
+          `).join('')}
+        </ul>
+      </div>` : ''}
+    </div>`;
+
+const renderForensicSection = (
+  title: string,
+  stream: 'maturity' | 'antipattern',
+  logs: Record<string, AuditItem>
+): string => {
+  const catalog = MASTER_BINGO_FINOPS[stream];
+  const body = BATCHES.map(batchId => {
+    const items = catalog.filter(c => c.batch === batchId);
+    if (items.length === 0) return '';
+    return `
+    <div class="forensic-batch">
+      <h3 class="forensic-batch-title">${batchId} — ${escapeHtml(BATCH_TITLES[batchId])}</h3>
+      ${items.map(cat => renderForensicCriterion(cat, logs[cat.id])).join('')}
+    </div>`;
+  }).join('');
+  return `
+  <h2>${escapeHtml(title)}</h2>
+  ${body}`;
+};
 
 export const downloadReport = (result: DiagnosticResult) => {
   const html = generateReportHtml(result);
@@ -44,7 +103,25 @@ const generateReportHtml = (result: DiagnosticResult): string => {
     .roadmap-phase h3 { color: #06b6d4; margin-bottom: 0.5rem; }
     .roadmap-phase ul { padding-left: 1.5rem; }
     .roadmap-phase li { margin: 0.5rem 0; }
-    @media print { body { background: white; color: #1e293b; } .card, .summary, .roadmap-phase { border-color: #e2e8f0; } }
+    .forensic-batch { margin: 1.5rem 0 2rem; }
+    .forensic-batch-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.15em; color: #94a3b8; margin: 1.5rem 0 0.75rem; }
+    .forensic-card { background: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; padding: 1.25rem; margin: 0.75rem 0; }
+    .forensic-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 0.5rem; }
+    .forensic-head h4 { font-size: 1rem; color: #f8fafc; line-height: 1.3; margin-top: 0.125rem; }
+    .forensic-id { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.75rem; color: #64748b; }
+    .badge { padding: 0.25rem 0.5rem; border-radius: 0.375rem; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; flex-shrink: 0; }
+    .badge-ok { background: #14532d; color: #86efac; }
+    .badge-partial { background: #78350f; color: #fcd34d; }
+    .badge-nok { background: #7f1d1d; color: #fca5a5; }
+    .badge-none { background: #334155; color: #94a3b8; }
+    .forensic-desc { font-size: 0.875rem; color: #94a3b8; margin-bottom: 0.75rem; }
+    .forensic-block { margin-top: 0.75rem; }
+    .forensic-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; color: #64748b; font-weight: 700; margin-bottom: 0.25rem; }
+    .forensic-reasoning { font-size: 0.875rem; color: #cbd5e1; white-space: pre-line; }
+    .forensic-quotes { list-style: none; padding: 0; margin: 0; }
+    .forensic-quotes li { font-size: 0.875rem; font-style: italic; color: #cbd5e1; border-left: 2px solid #475569; padding-left: 0.75rem; margin: 0.5rem 0; }
+    .forensic-section { font-size: 0.75rem; color: #64748b; font-style: normal; }
+    @media print { body { background: white; color: #1e293b; } .card, .summary, .roadmap-phase, .forensic-card { border-color: #e2e8f0; background: #f8fafc; color: #1e293b; } .forensic-head h4 { color: #0f172a; } .forensic-reasoning, .forensic-quotes li { color: #334155; } }
   </style>
 </head>
 <body>
@@ -71,10 +148,13 @@ const generateReportHtml = (result: DiagnosticResult): string => {
   <h2>Remediation Roadmap</h2>
   ${result.phase_3_strategy.remediation_roadmap.map(step => `
     <div class="roadmap-phase">
-      <h3>${step.phase}</h3>
-      <ul>${step.actions.map(a => `<li>${a}</li>`).join('')}</ul>
+      <h3>${escapeHtml(step.phase)}</h3>
+      <ul>${step.actions.map(a => `<li>${escapeHtml(a)}</li>`).join('')}</ul>
     </div>
   `).join('')}
+
+  ${renderForensicSection('Forensic Audit: FinOps Maturity', 'maturity', result.phase_1_audit_logs.maturity)}
+  ${renderForensicSection('Forensic Audit: Anti-Patterns', 'antipattern', result.phase_1_audit_logs.antipattern)}
 
   <script id="finops-data" type="application/json">${JSON.stringify(result)}</script>
 </body>

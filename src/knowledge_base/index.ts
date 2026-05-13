@@ -19,11 +19,13 @@ export const FINOPS_VALIDATION_RULES = validationData;
 const MASTER_BINGO_FINOPS = {
   maturity: FINOPS_CRITERIA.map(c => ({
     id: c.id,
+    batch: c.batch,
     title: c.title,
     desc: c.description
   })),
   antipattern: FINOPS_ANTIPATTERNS.map(c => ({
     id: c.id,
+    batch: c.batch,
     title: c.title,
     desc: c.description
   }))
@@ -51,7 +53,7 @@ interface BatchDefinition {
   antipattern: string;
 }
 
-const BATCH_TITLES: Record<string, string> = {
+export const BATCH_TITLES: Record<string, string> = {
   A: 'Cost Visibility & Allocation',
   B: 'Rate & Usage Optimization',
   C: 'Governance & Policy',
