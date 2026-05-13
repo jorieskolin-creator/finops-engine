@@ -6,7 +6,6 @@ import { DiagnosticResult, Phase1AuditLogs, Phase2Validation, AuditItem, Evidenc
 import { generateSafetyAuditPrompt } from "./securityService";
 import { validatePhase1Output, validatePhase3Grounding } from "./validatorService";
 import { callOpusStrategy } from "./anthropicService";
-import { GoogleGenAI } from "@google/genai";
 
 const ALL_CRITERIA_IDS = [
   'A1', 'A2', 'A3', 'A4', 'A5',
@@ -33,24 +32,6 @@ const parseAiResponse = (text: string): any => {
 };
 
 const callGeminiGenerate = async (model: string, contents: any[], systemInstruction?: string) => {
-  const isDev = (import.meta as any)?.env?.DEV;
-
-  if (isDev || !window.location.host.includes('vercel.app')) {
-    if (!process.env.API_KEY) {
-      throw new Error("API Key missing in environment. Please check .env file.");
-    }
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: contents,
-      config: {
-        systemInstruction: systemInstruction,
-        responseMimeType: "application/json"
-      }
-    });
-    return { text: response.text };
-  }
-
   const response = await fetch('/api/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -58,15 +39,6 @@ const callGeminiGenerate = async (model: string, contents: any[], systemInstruct
   });
 
   if (!response.ok) {
-    if (response.status === 404) {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const fallbackResponse = await ai.models.generateContent({
-        model: model,
-        contents: contents,
-        config: { systemInstruction: systemInstruction, responseMimeType: "application/json" }
-      });
-      return { text: fallbackResponse.text };
-    }
     throw new Error(`Proxy Error: ${response.statusText}`);
   }
 

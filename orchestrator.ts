@@ -1,7 +1,6 @@
 
 import { generateBatchSystemInstruction, generateBatchUserPrompt } from './prompts';
 import { BATCH_DEFINITIONS } from './knowledge_base';
-import { GoogleGenAI } from "@google/genai";
 
 const parseAiResponse = (text: string): any => {
   if (!text) return {};
@@ -22,21 +21,6 @@ const parseAiResponse = (text: string): any => {
 };
 
 const callGeminiGenerate = async (model: string, contents: any[], systemInstruction: string) => {
-  const isDev = (import.meta as any)?.env?.DEV;
-
-  if (isDev || !window.location.host.includes('vercel.app')) {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const response = await ai.models.generateContent({
-      model: model,
-      contents: contents,
-      config: {
-        systemInstruction: systemInstruction,
-        responseMimeType: "application/json"
-      }
-    });
-    return { text: response.text };
-  }
-
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 595000);
 
@@ -49,19 +33,6 @@ const callGeminiGenerate = async (model: string, contents: any[], systemInstruct
     });
 
     if (!response.ok) {
-      if (response.status === 404) {
-        clearTimeout(timeoutId);
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const fallbackResponse = await ai.models.generateContent({
-          model: model,
-          contents: contents,
-          config: {
-            systemInstruction: systemInstruction,
-            responseMimeType: "application/json"
-          }
-        });
-        return { text: fallbackResponse.text };
-      }
       const errorText = await response.text();
       throw new Error(`Proxy Error (${response.status}): ${errorText}`);
     }

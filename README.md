@@ -4,11 +4,18 @@ Evidence-gated FinOps Maturity Assessment scanner. React + TypeScript + Vite fro
 
 ## Local development
 
+The client always calls `/api/generate` and `/api/anthropic-generate`, so local
+dev needs the serverless functions running too. Use `vercel dev` (it serves
+the Vite frontend and the `api/*.js` functions together):
+
 ```bash
 npm install
 cp .env.example .env.local   # fill in API_KEY and ANTHROPIC_API_KEY
-npm run dev                  # http://localhost:3000
+npx vercel dev               # http://localhost:3000
 ```
+
+`npm run dev` (plain Vite) still works for UI-only work, but any audit run will
+fail because `/api/*` won't be served.
 
 ## Deployment (Vercel)
 
