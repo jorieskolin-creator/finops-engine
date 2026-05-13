@@ -1,6 +1,84 @@
 import React from 'react';
-import { DiagnosticResult } from '../types';
+import { AuditItem, DiagnosticResult } from '../types';
 import { MarkdownRenderer } from './DashboardComponents';
+import { BATCH_TITLES, MASTER_BINGO_FINOPS } from '../knowledge_base';
+
+const BATCHES: Array<'A' | 'B' | 'C' | 'D' | 'E'> = ['A', 'B', 'C', 'D', 'E'];
+
+const statusBadgeClass = (status: string): string => {
+  if (status === 'OK') return 'bg-emerald-100 text-emerald-700';
+  if (status === 'NOK') return 'bg-rose-100 text-rose-700';
+  if (status === 'Partial') return 'bg-amber-100 text-amber-700';
+  return 'bg-slate-100 text-slate-500';
+};
+
+const ForensicCriterion: React.FC<{
+  catalog: { id: string; title: string; desc: string };
+  item?: AuditItem;
+}> = ({ catalog, item }) => (
+  <div className="p-5 bg-white rounded-xl border border-slate-200">
+    <div className="flex items-start justify-between gap-4 mb-2">
+      <div className="min-w-0">
+        <span className="font-mono text-xs text-slate-400">{catalog.id}</span>
+        <h4 className="font-bold text-slate-900 leading-snug">{catalog.title}</h4>
+      </div>
+      <span className={`px-2 py-1 rounded text-xs font-bold uppercase tracking-wider shrink-0 ${statusBadgeClass(item?.status ?? '')}`}>
+        {item?.status ?? 'No Data'}
+      </span>
+    </div>
+    <p className="text-sm text-slate-500 mb-3">{catalog.desc}</p>
+    {item?.reasoning && (
+      <div className="mb-3">
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">AI Reasoning</p>
+        <p className="text-sm text-slate-700 whitespace-pre-line">{item.reasoning}</p>
+      </div>
+    )}
+    {item?.evidence_quotes && item.evidence_quotes.length > 0 && (
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Evidence</p>
+        <ul className="space-y-2">
+          {item.evidence_quotes.map((q, i) => (
+            <li key={i} className="border-l-2 border-slate-300 pl-3 text-sm italic text-slate-600">
+              &ldquo;{q.quote}&rdquo;
+              {q.section && <span className="text-xs text-slate-400 not-italic"> — {q.section}</span>}
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+  </div>
+);
+
+const ForensicSection: React.FC<{
+  title: string;
+  stream: 'maturity' | 'antipattern';
+  logs: Record<string, AuditItem>;
+}> = ({ title, stream, logs }) => {
+  const catalog = MASTER_BINGO_FINOPS[stream];
+  return (
+    <div className="mb-12">
+      <h2 className="text-2xl font-display font-bold text-slate-900 mb-6 pb-3 border-b border-slate-200">{title}</h2>
+      <div className="space-y-8">
+        {BATCHES.map(batchId => {
+          const items = catalog.filter(c => c.batch === batchId);
+          if (items.length === 0) return null;
+          return (
+            <div key={batchId}>
+              <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-3">
+                {batchId} — {BATCH_TITLES[batchId]}
+              </h3>
+              <div className="space-y-3">
+                {items.map(cat => (
+                  <ForensicCriterion key={cat.id} catalog={cat} item={logs[cat.id]} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 interface ReportViewProps {
   result: DiagnosticResult;
@@ -86,6 +164,18 @@ export const ReportView: React.FC<ReportViewProps> = ({ result, onBack, onDownlo
             </div>
           </div>
         )}
+
+        <ForensicSection
+          title="Forensic Audit: FinOps Maturity"
+          stream="maturity"
+          logs={result.phase_1_audit_logs.maturity}
+        />
+
+        <ForensicSection
+          title="Forensic Audit: Anti-Patterns"
+          stream="antipattern"
+          logs={result.phase_1_audit_logs.antipattern}
+        />
 
         <div className="text-center py-8 border-t border-slate-200 text-sm text-slate-400">
           <p>FinOps Assessment Engine v{result.meta.engine_version}</p>
