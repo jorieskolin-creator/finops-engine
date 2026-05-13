@@ -1,6 +1,7 @@
 
 import { generateBatchSystemInstruction, generateBatchUserPrompt } from './prompts';
 import { BATCH_DEFINITIONS } from './knowledge_base';
+import { MODEL_PHASE1 } from './models';
 
 const parseAiResponse = (text: string): any => {
   if (!text) return {};
@@ -65,7 +66,7 @@ export const runPhase1Audit = async (text: string, onProgress: (completed: numbe
       const userPrompt = generateBatchUserPrompt(batchId, definitions);
 
       const response = await callGeminiGenerate(
-        'gemini-2.5-pro-preview-05-06',
+        MODEL_PHASE1,
         [
           {
             role: 'user',

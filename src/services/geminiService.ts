@@ -5,7 +5,7 @@ import { knowledgeBaseService, BATCH_DEFINITIONS } from "../knowledge_base";
 import { DiagnosticResult, Phase1AuditLogs, Phase2Validation, AuditItem, EvidenceQuote } from "../types";
 import { generateSafetyAuditPrompt } from "./securityService";
 import { validatePhase1Output, validatePhase3Grounding } from "./validatorService";
-import { callOpusStrategy } from "./anthropicService";
+import { MODEL_PHASE1, MODEL_PHASE3 } from "../models";
 
 const ALL_CRITERIA_IDS = [
   'A1', 'A2', 'A3', 'A4', 'A5',
@@ -183,7 +183,7 @@ export const analyzeDocument = async (
     const dlpPrompt = generateSafetyAuditPrompt(text);
 
     const dlpResponse = await callGeminiGenerate(
-      'gemini-2.5-pro-preview-05-06',
+      MODEL_PHASE1,
       [{ role: 'user', parts: [{ text: dlpPrompt }] }]
     );
     const dlpResult = parseAiResponse(dlpResponse.text);
@@ -227,8 +227,8 @@ export const analyzeDocument = async (
           timestamp: new Date().toISOString(),
           engine_version: "finops-1.0.0",
           model_config: {
-            phase0_phase1: "gemini-2.5-pro-preview-05-06",
-            phase3: "claude-opus-4-7",
+            phase0_phase1: MODEL_PHASE1,
+            phase3: MODEL_PHASE3,
             validators: "deterministic"
           }
         },
@@ -266,15 +266,16 @@ CATEGORY BREAKDOWN:
 ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}: ${score}/15`).join('\n')}
 `;
 
-    const strategyResponse = await callOpusStrategy(
+    const strategyResponse = await callGeminiGenerate(
+      MODEL_PHASE3,
       [
         {
-          role: "user",
-          content: [
-            { type: "text", text: STRATEGY_USER_PROMPT },
-            { type: "text", text: `\n\n### THE GOLDEN STANDARD (SSOT)\nYou must ignore generic internet advice. You may ONLY prescribe solutions found in this Knowledge Base:\n\n${fullSSOT}` },
-            { type: "text", text: `\n\n### DIAGNOSTIC FINDINGS (Phase 1 & 2)\nUse these specific gaps and anti-patterns to trigger the strategies above:\n${handoffSummary}` },
-            { type: "text", text: `\n\n### ORIGINAL SOURCE CONTEXT\n<SOURCE_DOCUMENT_TO_AUDIT>\n${text.substring(0, 50000)}\n</SOURCE_DOCUMENT_TO_AUDIT>` }
+          role: 'user',
+          parts: [
+            { text: STRATEGY_USER_PROMPT },
+            { text: `\n\n### THE GOLDEN STANDARD (SSOT)\nYou must ignore generic internet advice. You may ONLY prescribe solutions found in this Knowledge Base:\n\n${fullSSOT}` },
+            { text: `\n\n### DIAGNOSTIC FINDINGS (Phase 1 & 2)\nUse these specific gaps and anti-patterns to trigger the strategies above:\n${handoffSummary}` },
+            { text: `\n\n### ORIGINAL SOURCE CONTEXT\n<SOURCE_DOCUMENT_TO_AUDIT>\n${text.substring(0, 50000)}\n</SOURCE_DOCUMENT_TO_AUDIT>` }
           ]
         }
       ],
@@ -297,8 +298,8 @@ ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}
         timestamp: new Date().toISOString(),
         engine_version: "finops-1.0.0",
         model_config: {
-          phase0_phase1: "gemini-2.5-pro-preview-05-06",
-          phase3: "claude-opus-4-7",
+          phase0_phase1: MODEL_PHASE1,
+          phase3: MODEL_PHASE3,
           validators: "deterministic"
         }
       },
