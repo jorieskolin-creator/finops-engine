@@ -22,12 +22,26 @@ fail because `/api/*` won't be served.
 1. Import the repo into Vercel.
 2. Set environment variables in **Project Settings → Environment Variables**:
    - `GEMINI_API_KEY` — Google Gemini key (server-side only, never exposed to browser)
+   - `SECRET_KEY` — access password for running assessments; also the HMAC key for session cookies. Pick a long random string (>= 32 chars).
    - `VITE_FINOPS_TACTICS_URL` — optional public Blob URL for the tactics DB
    - `ANTHROPIC_API_KEY` — optional, only if you re-enable the Anthropic path
 3. Build command: `npm run build` (default). Output: `dist/`.
 4. The serverless functions in `api/` are auto-registered by Vercel; `vercel.json` grants them up to 600s execution.
 
 Secrets are **not** inlined into the client bundle — `vite.config.ts` only exposes `VITE_*` vars. All Gemini/Anthropic traffic from the browser goes through `/api/generate` and `/api/anthropic-generate`.
+
+### Access control
+
+The UI loads for anyone, but **running an assessment requires logging in.** Login is a single shared password held in `SECRET_KEY`.
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/login` | POST `{password}` | Verifies password (timing-safe), sets an HMAC-signed `fe_session` cookie (HttpOnly, SameSite=Lax, 8h TTL). |
+| `/api/logout` | POST | Clears the cookie. |
+| `/api/session` | GET | Returns 200 if the cookie is valid, 401 otherwise. |
+| `/api/generate`, `/api/anthropic-generate` | POST | Reject with 401 if the cookie is missing or invalid. |
+
+Implementation lives in `lib/auth.js` (`node:crypto` only — no external deps, no Vercel-specific code, so it ports cleanly to any Node host). The cookie is signed with HMAC-SHA256 keyed by `SECRET_KEY`, so rotating `SECRET_KEY` invalidates all active sessions.
 
 ### Model configuration
 

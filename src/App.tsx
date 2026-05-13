@@ -8,6 +8,8 @@ import { PerformanceMonitor } from './services/debugService';
 import { DiagnosticResult, ScanResult } from './types';
 import { GaugeCard, AuditGrid, StrategicRoadmap, ComparisonChart, ReferenceLibrary, SignalWarningBanner, BenchmarkingChart, TransferProtocol, MarkdownRenderer, NeuralLoadingGrid } from './components/DashboardComponents';
 import { ReportView } from './components/ReportView';
+import { LoginModal } from './components/LoginModal';
+import { checkSession, logout } from './services/authService';
 
 interface UploadedFile {
   id: string;
@@ -65,7 +67,14 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'audit' | 'strategy' | 'reference'>('overview');
   const [viewMode, setViewMode] = useState<'dashboard' | 'report'>('dashboard');
   const [scanResult, setScanResult] = useState<ScanResult>({ score: 0, status: 'Insufficient', message: 'Waiting...', details: [], canRun: false });
+  const [authenticated, setAuthenticated] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const pendingAnalyzeRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    checkSession().then(setAuthenticated);
+  }, []);
 
   const MIN_FILES = 2;
   const MAX_FILES = 12;
@@ -178,8 +187,7 @@ const App: React.FC = () => {
 
   const removeFile = (id: string) => setFiles(files.filter(f => f.id !== id));
 
-  const handleAnalyze = async () => {
-    if (!aggregatedText || !scanResult.canRun) return;
+  const runAnalyze = async () => {
     setLoading(true);
     setLoadingStage('audit');
     setAuditProgress(0);
@@ -200,6 +208,16 @@ const App: React.FC = () => {
       setLoadingStage(null);
       PerformanceMonitor.end('FullAnalysis');
     }
+  };
+
+  const handleAnalyze = async () => {
+    if (!aggregatedText || !scanResult.canRun) return;
+    if (!authenticated) {
+      pendingAnalyzeRef.current = true;
+      setShowLogin(true);
+      return;
+    }
+    await runAnalyze();
   };
 
   const reset = () => {
@@ -240,6 +258,27 @@ const App: React.FC = () => {
               </span>
               <span className="text-[10px] font-bold uppercase tracking-widest text-emerald-400">System Online</span>
             </div>
+
+            <button
+              onClick={async () => {
+                if (authenticated) {
+                  await logout();
+                  setAuthenticated(false);
+                } else {
+                  pendingAnalyzeRef.current = false;
+                  setShowLogin(true);
+                }
+              }}
+              className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-bold uppercase tracking-widest transition-colors ${
+                authenticated
+                  ? 'bg-emerald-950/30 border-emerald-900/50 text-emerald-400 hover:text-white hover:border-emerald-500'
+                  : 'bg-slate-900/50 border-slate-700 text-slate-400 hover:text-white hover:border-amber-500'
+              }`}
+              title={authenticated ? 'Click to log out' : 'Click to log in'}
+            >
+              <span>{authenticated ? '🔓' : '🔒'}</span>
+              <span>{authenticated ? 'Unlocked' : 'Locked'}</span>
+            </button>
 
             {!result && (
               <button onClick={() => setActiveTab(activeTab === 'reference' ? 'overview' : 'reference')} className="text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-white transition-colors px-4 py-2 rounded-lg hover:bg-white/5">
@@ -497,6 +536,22 @@ const App: React.FC = () => {
           </div>
         </div>
       </footer>
+
+      <LoginModal
+        open={showLogin}
+        onClose={() => {
+          setShowLogin(false);
+          pendingAnalyzeRef.current = false;
+        }}
+        onSuccess={() => {
+          setShowLogin(false);
+          setAuthenticated(true);
+          if (pendingAnalyzeRef.current) {
+            pendingAnalyzeRef.current = false;
+            runAnalyze();
+          }
+        }}
+      />
     </div>
   );
 };
