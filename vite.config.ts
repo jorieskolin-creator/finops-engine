@@ -3,9 +3,10 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  // API_KEY and ANTHROPIC_API_KEY are intentionally NOT defined here — they must
+  // stay on the server (api/*.js Vercel functions). Only public, VITE_-prefixed
+  // vars are exposed to the browser, via Vite's built-in import.meta.env.
   define: {
-    'process.env.API_KEY': JSON.stringify(process.env.API_KEY),
-    'process.env.ANTHROPIC_API_KEY': JSON.stringify(process.env.ANTHROPIC_API_KEY),
     'process.env.VITE_FINOPS_TACTICS_URL': JSON.stringify(process.env.VITE_FINOPS_TACTICS_URL),
   },
   build: {
