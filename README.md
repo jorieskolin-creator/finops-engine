@@ -56,6 +56,18 @@ Gemini 3 uses `thinkingLevel` (`'low' | 'medium' | 'high'`); Gemini 2.5 uses `th
 
 The Anthropic path (`src/services/anthropicService.ts`, `api/anthropic-generate.js`) is left dormant. Re-enable by swapping the Phase 3 call in `src/services/geminiService.ts` back to `callOpusStrategy` and adding `ANTHROPIC_API_KEY` to the platform env vars.
 
+### Drift Test (MVP)
+
+A **Drift Test** button appears in the header once you're logged in. Click it to run the assessment pipeline against the three bundled golden fixtures (`test/golden-{crawl,walk,run}.txt`) combined into a single document set. The result shows on the normal report screen; download the HTML via "Review & Download Report" and diff against previous runs manually.
+
+This MVP intentionally does not store results anywhere. The plan once the procedure is validated:
+1. Persist each drift run (Vercel Blob → Postgres) and add a history view.
+2. Add per-criterion count-delta + score-delta computation against `src/knowledge_base/golden_baselines.json`.
+3. Add embedding-based similarity on the Phase 3 executive summary.
+4. Add an `ADMIN_SECRET` gate for write/destructive operations once admin actions exist.
+
+The golden fixtures are bundled via Vite `?raw` imports in `src/App.tsx`, so the client ships them — no static-asset route needed.
+
 ## Deployment (Railway)
 
 Railway can host the same build via its Vite preset; configure the same env vars in the service settings. Note that `api/*.js` are written for the Vercel function runtime — running on Railway as a Node server would require a small adapter.
