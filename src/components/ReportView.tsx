@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { AuditItem, DiagnosticResult } from '../types';
 import { MarkdownRenderer } from './DashboardComponents';
 import { BATCH_TITLES, MASTER_BINGO_FINOPS } from '../knowledge_base';
@@ -53,29 +53,75 @@ const ForensicSection: React.FC<{
   title: string;
   stream: 'maturity' | 'antipattern';
   logs: Record<string, AuditItem>;
-}> = ({ title, stream, logs }) => {
+  criticalLabel: string;
+  criticalHint: string;
+}> = ({ title, stream, logs, criticalLabel, criticalHint }) => {
+  const [mode, setMode] = useState<'all' | 'critical'>('all');
   const catalog = MASTER_BINGO_FINOPS[stream];
+  const totalCount = catalog.length;
+  const isCritical = (item?: AuditItem): boolean => item?.status === 'NOK';
+  const criticalCount = catalog.filter(c => isCritical(logs[c.id])).length;
+  const visibleCatalog = mode === 'critical' ? catalog.filter(c => isCritical(logs[c.id])) : catalog;
+
+  const pillBase = 'px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-colors';
+  const pillActive = 'bg-slate-900 text-white';
+  const pillIdle = 'bg-slate-100 text-slate-500 hover:bg-slate-200';
+
   return (
     <div className="mb-12">
-      <h2 className="text-2xl font-display font-bold text-slate-900 mb-6 pb-3 border-b border-slate-200">{title}</h2>
-      <div className="space-y-8">
-        {BATCHES.map(batchId => {
-          const items = catalog.filter(c => c.batch === batchId);
-          if (items.length === 0) return null;
-          return (
-            <div key={batchId}>
-              <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-3">
-                {batchId} — {BATCH_TITLES[batchId]}
-              </h3>
-              <div className="space-y-3">
-                {items.map(cat => (
-                  <ForensicCriterion key={cat.id} catalog={cat} item={logs[cat.id]} />
-                ))}
-              </div>
-            </div>
-          );
-        })}
+      <div className="flex flex-wrap items-baseline justify-between gap-3 mb-4 pb-3 border-b border-slate-200">
+        <h2 className="text-2xl font-display font-bold text-slate-900">
+          {title}
+          <span className="ml-3 text-sm font-normal text-slate-400">
+            {totalCount} criteria · {criticalCount} {criticalHint}
+          </span>
+        </h2>
+        <div className="flex items-center gap-2" role="group" aria-label={`${title} filter`}>
+          <button
+            type="button"
+            onClick={() => setMode('all')}
+            className={`${pillBase} ${mode === 'all' ? pillActive : pillIdle}`}
+            aria-pressed={mode === 'all'}
+          >
+            All {totalCount}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode('critical')}
+            disabled={criticalCount === 0}
+            className={`${pillBase} ${mode === 'critical' ? pillActive : pillIdle} ${criticalCount === 0 ? 'opacity-40 cursor-not-allowed hover:bg-slate-100' : ''}`}
+            aria-pressed={mode === 'critical'}
+            title={criticalCount === 0 ? `No ${criticalHint} in this stream.` : undefined}
+          >
+            {criticalLabel} {criticalCount}
+          </button>
+        </div>
       </div>
+
+      {visibleCatalog.length === 0 ? (
+        <div className="p-6 bg-emerald-50 border border-emerald-200 rounded-xl text-sm text-emerald-700">
+          No {criticalHint} in this stream — nothing to flag.
+        </div>
+      ) : (
+        <div className="space-y-8">
+          {BATCHES.map(batchId => {
+            const items = visibleCatalog.filter(c => c.batch === batchId);
+            if (items.length === 0) return null;
+            return (
+              <div key={batchId}>
+                <h3 className="text-sm font-bold uppercase tracking-widest text-slate-500 mb-3">
+                  {batchId} — {BATCH_TITLES[batchId]}
+                </h3>
+                <div className="space-y-3">
+                  {items.map(cat => (
+                    <ForensicCriterion key={cat.id} catalog={cat} item={logs[cat.id]} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
@@ -169,12 +215,16 @@ export const ReportView: React.FC<ReportViewProps> = ({ result, onBack, onDownlo
           title="Forensic Audit: FinOps Maturity"
           stream="maturity"
           logs={result.phase_1_audit_logs.maturity}
+          criticalLabel="Gaps only"
+          criticalHint="gaps"
         />
 
         <ForensicSection
           title="Forensic Audit: Anti-Patterns"
           stream="antipattern"
           logs={result.phase_1_audit_logs.antipattern}
+          criticalLabel="Red flags only"
+          criticalHint="red flags"
         />
 
         <div className="text-center py-8 border-t border-slate-200 text-sm text-slate-400">
