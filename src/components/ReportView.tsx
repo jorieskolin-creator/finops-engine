@@ -315,21 +315,72 @@ export const ReportView: React.FC<ReportViewProps> = ({ result, onBack, onDownlo
           {(() => {
             const summaries = result.phase_3_strategy.executive_summaries;
             const ids: PersonaId[] = ['finops_lead', 'cfo', 'engineering_lead'];
+            const unsupported = result.quality_gate?.fact_check?.unsupported_claims || [];
+            const attempts = result.quality_gate?.fact_check?.attempts || 0;
             if (summaries && ids.some(id => summaries[id])) {
               return (
                 <div className="space-y-8">
-                  {ids.map(id => (
-                    <div key={id}>
-                      <h3 className="text-sm font-bold uppercase tracking-widest text-emerald-700 mb-3">For the {PERSONA_LABELS[id]}</h3>
-                      <MarkdownRenderer content={summaries[id]} textColor="text-slate-700" />
-                    </div>
-                  ))}
+                  {ids.map(id => {
+                    const personaClaims = unsupported.filter(c => c.source_location === id);
+                    return (
+                      <div key={id}>
+                        <h3 className="text-sm font-bold uppercase tracking-widest text-emerald-700 mb-3">For the {PERSONA_LABELS[id]}</h3>
+                        <MarkdownRenderer content={summaries[id]} textColor="text-slate-700" />
+                        {personaClaims.length > 0 && (
+                          <div className="mt-4 p-4 rounded-lg bg-amber-50 border border-amber-200">
+                            <p className="text-xs font-bold uppercase tracking-widest text-amber-700 mb-2">Confidence Notes — Unverified Claims</p>
+                            <p className="text-xs text-amber-800 mb-2">The following statements could not be verified against the source after {attempts} regenerate pass(es). Treat with caution.</p>
+                            <ul className="space-y-1.5">
+                              {personaClaims.map((c, i) => (
+                                <li key={i} className="text-sm text-amber-900">
+                                  <span className="italic">&ldquo;{c.claim}&rdquo;</span>
+                                  <span className="block text-xs text-amber-700 mt-0.5">{c.rationale}{c.failure_type ? ` · ${c.failure_type.replace(/_/g, ' ')}` : ''}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               );
             }
             return <MarkdownRenderer content={result.phase_3_strategy.executive_summary} textColor="text-slate-700" />;
           })()}
         </div>
+
+        {(() => {
+          const claims = result.quality_gate?.fact_check?.unsupported_claims || [];
+          const withMaterial = claims.filter(c => c.missing_material);
+          if (withMaterial.length === 0) return null;
+          const byType: Record<string, string[]> = {};
+          for (const c of withMaterial) {
+            const key = c.failure_type ? c.failure_type.replace(/_/g, ' ') : 'other';
+            (byType[key] ||= []).push(c.missing_material!);
+          }
+          return (
+            <div className="mb-12 p-6 rounded-xl bg-amber-50 border border-amber-200">
+              <h2 className="text-xl font-display font-bold text-slate-900 mb-1">Source Coverage Gaps</h2>
+              <p className="text-sm text-slate-600 mb-4">To strengthen the next assessment cycle, include the following kinds of evidence in the source document.</p>
+              <div className="space-y-4">
+                {Object.entries(byType).map(([type, materials]) => (
+                  <div key={type}>
+                    <p className="text-xs font-bold uppercase tracking-widest text-amber-700 mb-1.5">{type}</p>
+                    <ul className="space-y-1">
+                      {Array.from(new Set(materials)).map((m, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                          <span className="mt-1.5 w-1 h-1 rounded-full bg-amber-500 shrink-0"></span>
+                          <span>{m}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {result.phase_3_strategy.remediation_roadmap.length > 0 && (
           <div className="mb-12">

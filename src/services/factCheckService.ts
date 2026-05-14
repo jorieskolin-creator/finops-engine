@@ -1,5 +1,8 @@
 
-import { AuditItem, FactCheckClaim, FactCheckResult, Phase1AuditLogs, Phase2Validation } from '../types';
+import { AuditItem, FactCheckClaim, FactCheckResult, Phase1AuditLogs, Phase2Validation, ClaimFailureType, ClaimSourceLocation } from '../types';
+
+const VALID_FAILURE_TYPES: ClaimFailureType[] = ['fabricated_number', 'unverifiable_entity', 'unsupported_org_claim', 'out_of_scope', 'other'];
+const VALID_SOURCE_LOCATIONS: ClaimSourceLocation[] = ['finops_lead', 'cfo', 'engineering_lead', 'roadmap'];
 
 export interface FactCheckInputs {
   executiveSummary: string;
@@ -58,13 +61,24 @@ Your job: extract every distinct factual claim from the STRATEGY OUTPUT below, t
 - Specifically check: percentages, named tools/companies/teams/products, numerical counts (e.g. "22 anti-patterns"), claims about specific organizational structures, claims about specific named processes.
 - Be skeptical: if a claim is specific enough to be falsifiable but you cannot find it in the inputs, classify as "unsupported".
 - Maximum 15 claims per pass — focus on the most consequential.
+- The strategy output below is divided into sections with [Persona: finops_lead | cfo | engineering_lead] headers, followed by REMEDIATION ROADMAP ACTIONS. For every claim you flag, tag "source_location" as the persona id the claim was found under, or "roadmap" if it was found in the roadmap actions block.
+- For every claim classified "unsupported", you MUST additionally emit:
+  - "failure_type": one of "fabricated_number" (invented %, $, count), "unverifiable_entity" (named tool / company / team / product not in source), "unsupported_org_claim" (assertion about org structure or behavior not in source), "out_of_scope" (claim about something the inputs simply do not address), or "other".
+  - "missing_material": one short sentence describing what specific evidence in a future source document would make this claim supportable (e.g., "a tagging policy document", "a monthly cost review meeting note", "a named FinOps team headcount").
 - Output JSON ONLY, no prose.
 </rules>
 
 <output_format>
 {
   "claims": [
-    { "claim": "exact phrase from the strategy output", "classification": "supported_by_source" | "supported_by_audit" | "unsupported", "rationale": "one short sentence" }
+    {
+      "claim": "exact phrase from the strategy output",
+      "classification": "supported_by_source" | "supported_by_audit" | "unsupported",
+      "rationale": "one short sentence",
+      "source_location": "finops_lead | cfo | engineering_lead | roadmap",
+      "failure_type": "fabricated_number | unverifiable_entity | unsupported_org_claim | out_of_scope | other (REQUIRED when classification is unsupported, otherwise omit)",
+      "missing_material": "what additional source content would make this claim supportable (REQUIRED when classification is unsupported, otherwise omit)"
+    }
   ]
 }
 </output_format>
@@ -108,13 +122,28 @@ export const parseFactCheckResponse = (text: string, attempts: number): FactChec
     const claims = Array.isArray(parsed.claims) ? parsed.claims : [];
     const validClaims: FactCheckClaim[] = claims
       .filter((c: any) => c && typeof c.claim === 'string' && typeof c.classification === 'string')
-      .map((c: any) => ({
-        claim: c.claim,
-        classification: ['supported_by_source', 'supported_by_audit', 'unsupported'].includes(c.classification)
+      .map((c: any) => {
+        const classification = ['supported_by_source', 'supported_by_audit', 'unsupported'].includes(c.classification)
           ? c.classification
-          : 'unsupported',
-        rationale: typeof c.rationale === 'string' ? c.rationale : ''
-      }));
+          : 'unsupported';
+        const claim: FactCheckClaim = {
+          claim: c.claim,
+          classification,
+          rationale: typeof c.rationale === 'string' ? c.rationale : ''
+        };
+        if (typeof c.source_location === 'string' && VALID_SOURCE_LOCATIONS.includes(c.source_location)) {
+          claim.source_location = c.source_location;
+        }
+        if (classification === 'unsupported') {
+          if (typeof c.failure_type === 'string' && VALID_FAILURE_TYPES.includes(c.failure_type)) {
+            claim.failure_type = c.failure_type;
+          }
+          if (typeof c.missing_material === 'string' && c.missing_material.length > 0) {
+            claim.missing_material = c.missing_material;
+          }
+        }
+        return claim;
+      });
     const unsupported = validClaims.filter(c => c.classification === 'unsupported');
     return {
       attempts,
@@ -135,17 +164,48 @@ export const parseFactCheckResponse = (text: string, attempts: number): FactChec
   }
 };
 
-export const buildRegenerateAppendix = (unsupported: FactCheckClaim[]): string => `
+const FAILURE_TYPE_GUIDANCE: Record<ClaimFailureType, string> = {
+  fabricated_number: 'You invented a number not present in Phase 2 metrics or the source. Do not replace it with another invented number. Reference the relevant metric generically ("the audit shows significant burden") or omit the figure.',
+  unverifiable_entity: 'You named a tool, team, company, or product not present in the source. Remove the named entity. Reference it generically ("the deployment pipeline", "the central team") or omit it.',
+  unsupported_org_claim: 'You asserted something about the organization (structure, behavior, ownership) that is not in the source. Remove the assertion or qualify it as a recommended state, not a current one.',
+  out_of_scope: 'You made a claim about something the source simply does not address. Do not address it at all in the regenerated output.',
+  other: 'The claim could not be verified. Remove it or replace with a verified statement from the Phase 1 evidence.'
+};
+
+export const buildRegenerateAppendix = (unsupported: FactCheckClaim[]): string => {
+  const grouped: Partial<Record<ClaimFailureType, FactCheckClaim[]>> = {};
+  const ungrouped: FactCheckClaim[] = [];
+  for (const c of unsupported) {
+    if (c.failure_type) {
+      (grouped[c.failure_type] ||= []).push(c);
+    } else {
+      ungrouped.push(c);
+    }
+  }
+
+  const groupBlocks = (Object.keys(grouped) as ClaimFailureType[]).map(type => {
+    const items = grouped[type]!;
+    return `**Failure mode: ${type}** — ${FAILURE_TYPE_GUIDANCE[type]}
+${items.map(c => `  - "${c.claim}"\n      Found in: ${c.source_location || 'unspecified'}\n      Reason: ${c.rationale}`).join('\n')}`;
+  }).join('\n\n');
+
+  const ungroupedBlock = ungrouped.length > 0
+    ? `\n\n**Other unverified claims:**\n${ungrouped.map(c => `  - "${c.claim}"\n      Reason: ${c.rationale}`).join('\n')}`
+    : '';
+
+  return `
 
 ### REGENERATE INSTRUCTIONS — your previous output failed fact-check
 
-A separate fact-check pass found these claims in your previous executive summary or roadmap that were not supported by the source document or the verified Phase 1 evidence:
+A separate fact-check pass found these claims in your previous executive summaries or roadmap that were not supported by the source document or the verified Phase 1 evidence. Each is grouped by failure mode with specific guidance for how to fix it.
 
-${unsupported.map(c => `- "${c.claim}"\n    Reason: ${c.rationale}`).join('\n')}
+${groupBlocks}${ungroupedBlock}
 
-Regenerate the executive summary AND remediation roadmap. The new output:
+Regenerate the executive summaries (all three personas) AND remediation roadmap. The new output:
 - MUST NOT include any of the above claims, even rephrased.
+- MUST follow the failure-mode-specific guidance above.
 - MUST cite only facts that appear in <SOURCE_DOCUMENT_TO_AUDIT> or in the Phase 1 evidence quotes already provided.
 - Prefer fewer specific claims over inventing replacements. It is better to be vague but truthful than precise but unsupported.
-- Keep the exact same JSON output shape.
+- Keep the exact same JSON output shape (executive_summaries with finops_lead / cfo / engineering_lead, visual_scorecard, remediation_roadmap).
 `;
+};

@@ -153,6 +153,19 @@ const generateReportHtml = (result: DiagnosticResult): string => {
     .summary { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 2rem; line-height: 1.75; color: #334155; margin-bottom: 1.5rem; }
     .summary strong { color: #0f172a; }
     .persona-heading { font-size: 0.875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #047857; margin: 0.5rem 0 0.75rem 0; }
+    .confidence-notes { background: #fffbeb; border: 1px solid #fde68a; border-radius: 0.75rem; padding: 1rem 1.25rem; margin: 0.5rem 0 1.5rem 0; }
+    .confidence-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #b45309; margin: 0 0 0.5rem 0; }
+    .confidence-lead { font-size: 0.8125rem; color: #92400e; margin: 0 0 0.75rem 0; }
+    .confidence-notes ul { list-style: none; padding: 0; margin: 0; }
+    .confidence-notes li { margin-bottom: 0.5rem; color: #78350f; font-size: 0.875rem; }
+    .cn-claim { font-style: italic; display: block; }
+    .cn-rationale { display: block; font-size: 0.75rem; color: #b45309; margin-top: 0.125rem; }
+    .coverage-gaps { background: #fffbeb; border: 1px solid #fde68a; border-radius: 1rem; padding: 1.5rem 2rem; margin-bottom: 2rem; }
+    .cg-lead { font-size: 0.875rem; color: #475569; margin: 0 0 1rem 0; }
+    .cg-group { margin-bottom: 1rem; }
+    .cg-type { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #b45309; margin: 0 0 0.5rem 0; }
+    .coverage-gaps ul { margin: 0; padding-left: 1.25rem; }
+    .coverage-gaps li { font-size: 0.875rem; color: #334155; margin-bottom: 0.25rem; }
     .roadmap-phase { background: #ffffff; border: 1px solid #e2e8f0; border-left: 3px solid #10b981; padding: 1.25rem 1.5rem; margin: 1rem 0; border-radius: 0 0.75rem 0.75rem 0; }
     .roadmap-phase h3 { color: #0f172a; margin-bottom: 0.75rem; font-size: 1rem; }
     .roadmap-phase ul { list-style: none; padding: 0; margin: 0; }
@@ -262,13 +275,50 @@ const generateReportHtml = (result: DiagnosticResult): string => {
       { id: 'cfo', label: 'CFO' },
       { id: 'engineering_lead', label: 'Engineering Lead' }
     ];
+    const unsupported = result.quality_gate?.fact_check?.unsupported_claims || [];
+    const attempts = result.quality_gate?.fact_check?.attempts || 0;
+    const renderConfidence = (personaId: string): string => {
+      const personaClaims = unsupported.filter(c => c.source_location === personaId);
+      if (personaClaims.length === 0) return '';
+      return `
+        <div class="confidence-notes">
+          <p class="confidence-title">Confidence Notes — Unverified Claims</p>
+          <p class="confidence-lead">The following statements could not be verified against the source after ${attempts} regenerate pass(es). Treat with caution.</p>
+          <ul>
+            ${personaClaims.map(c => `<li><span class="cn-claim">&ldquo;${escapeHtml(c.claim)}&rdquo;</span><span class="cn-rationale">${escapeHtml(c.rationale)}${c.failure_type ? ` · ${escapeHtml(c.failure_type.replace(/_/g, ' '))}` : ''}</span></li>`).join('')}
+          </ul>
+        </div>`;
+    };
     if (summaries && personas.some(p => summaries[p.id])) {
       return personas.map(p => `
         <h3 class="persona-heading">For the ${escapeHtml(p.label)}</h3>
         <div class="summary">${(summaries[p.id] || '').replace(/\n/g, '<br>')}</div>
+        ${renderConfidence(p.id)}
       `).join('');
     }
     return `<div class="summary">${(result.phase_3_strategy.executive_summary || '').replace(/\n/g, '<br>')}</div>`;
+  })()}
+
+  ${(() => {
+    const claims = result.quality_gate?.fact_check?.unsupported_claims || [];
+    const withMaterial = claims.filter(c => c.missing_material);
+    if (withMaterial.length === 0) return '';
+    const byType: Record<string, string[]> = {};
+    for (const c of withMaterial) {
+      const key = c.failure_type ? c.failure_type.replace(/_/g, ' ') : 'other';
+      (byType[key] ||= []).push(c.missing_material!);
+    }
+    return `
+      <h2>Source Coverage Gaps</h2>
+      <div class="coverage-gaps">
+        <p class="cg-lead">To strengthen the next assessment cycle, include the following kinds of evidence in the source document.</p>
+        ${Object.entries(byType).map(([type, materials]) => `
+          <div class="cg-group">
+            <p class="cg-type">${escapeHtml(type)}</p>
+            <ul>${Array.from(new Set(materials)).map(m => `<li>${escapeHtml(m)}</li>`).join('')}</ul>
+          </div>
+        `).join('')}
+      </div>`;
   })()}
 
   <h2>Remediation Roadmap</h2>
