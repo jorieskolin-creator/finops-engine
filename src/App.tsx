@@ -511,19 +511,21 @@ const App: React.FC = () => {
                   <p className="text-lg md:text-xl text-slate-300 font-light max-w-3xl mx-auto leading-relaxed">
                     Your cloud spend is either a strategic asset or a hidden liability. This <strong>forensic assessment tool</strong> interrogates your FinOps documentation against <strong>25 maturity vectors and 25 anti-pattern indicators</strong> to determine your Crawl-Walk-Run classification.
                   </p>
-                  <div className="mt-8 flex justify-center">
-                    <a
-                      href="https://honourable-peacock.static2.website/finops-engine-structure-thinking-14052026"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-emerald-300 hover:text-white bg-emerald-950/30 hover:bg-emerald-700/40 border border-emerald-700/40 hover:border-emerald-400 transition-colors px-5 py-2.5 rounded-full"
-                    >
-                      <span>How the FinOps Assessment Engine thinks</span>
-                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                      </svg>
-                    </a>
-                  </div>
+                  {authenticated && (
+                    <div className="mt-8 flex justify-center">
+                      <a
+                        href="https://honourable-peacock.static2.website/finops-engine-structure-thinking-14052026"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-emerald-300 hover:text-white bg-emerald-950/30 hover:bg-emerald-700/40 border border-emerald-700/40 hover:border-emerald-400 transition-colors px-5 py-2.5 rounded-full"
+                      >
+                        <span>How the FinOps Assessment Engine thinks</span>
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                        </svg>
+                      </a>
+                    </div>
+                  )}
                 </div>
 
                 <div className={`glass-panel rounded-[3rem] shadow-[0_0_50px_rgba(0,0,0,0.3)] border relative overflow-hidden group transition-all duration-500 ${files.length >= MIN_FILES ? 'border-emerald-500/50 ring-2 ring-emerald-500/20 shadow-[0_0_50px_rgba(16,185,129,0.1)]' : 'border-white/10'}`}>
