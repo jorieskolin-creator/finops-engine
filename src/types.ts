@@ -77,11 +77,26 @@ export interface AnalysisMeta {
   };
 }
 
+export type QualityGateDecision = 'GO' | 'WARN' | 'BLOCK';
+
+export interface QualityGateResult {
+  decision: QualityGateDecision;
+  blocking_reasons: string[];
+  warnings: string[];
+  notes: string[];
+  thresholds: {
+    evidence_density_block: number;
+    evidence_density_warn: number;
+    silent_areas_warn: number;
+  };
+}
+
 export interface DiagnosticResult {
   meta: AnalysisMeta;
   phase_1_audit_logs: Phase1AuditLogs;
   phase_2_validation: Phase2Validation;
   phase_3_strategy: Phase3Strategy;
+  quality_gate: QualityGateResult;
 }
 
 export interface ScanResult {

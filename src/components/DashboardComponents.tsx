@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend, Tooltip } from 'recharts';
-import { AuditCategory, AuditItem, RemediationStep } from '../types';
+import { AuditCategory, AuditItem, QualityGateResult, RemediationStep } from '../types';
 import { BATCH_DEFINITIONS, MASTER_BINGO_FINOPS } from '../knowledge_base';
 
 interface GaugeProps {
@@ -288,23 +288,82 @@ export const BenchmarkingChart: React.FC<BenchmarkingProps> = ({ x, y }) => {
   );
 };
 
-export const SignalWarningBanner: React.FC<{ density: number }> = ({ density }) => {
-  if (density >= 60) return null;
-  return (
-    <div className="glass-panel p-6 mb-8 flex items-start gap-5 border-l-4 border-l-rose-500 animate-fade-in bg-rose-950/10 backdrop-blur-md">
-      <div className="p-3 rounded-full bg-rose-900/30 text-rose-400 shadow-inner flex-shrink-0 relative overflow-hidden border border-rose-500/20">
-        <div className="absolute inset-0 bg-rose-400/10 animate-ping rounded-full"></div>
-        <svg className="w-6 h-6 relative z-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+export const QualityGateBanner: React.FC<{ gate: QualityGateResult }> = ({ gate }) => {
+  const [expanded, setExpanded] = useState(gate.decision === 'BLOCK');
+
+  if (gate.decision === 'GO') {
+    return (
+      <div className="glass-panel p-4 mb-6 flex items-start gap-3 border-l-4 border-l-emerald-500 bg-emerald-950/10 backdrop-blur-md">
+        <svg className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+        </svg>
+        <div className="text-sm">
+          <span className="font-bold text-emerald-300">Quality Gate: GO</span>
+          <span className="text-slate-400 ml-2">{gate.notes[0] ?? 'All checks passed.'}</span>
+        </div>
       </div>
-      <div>
-        <h4 className="font-bold text-lg font-display mb-1 text-slate-100 flex items-center gap-2">
-          Low Evidence Density
-          <span className="text-[10px] font-mono font-bold bg-rose-900/40 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30 uppercase tracking-wide">{density}% with quotes</span>
-        </h4>
-        <p className="text-sm text-slate-300 leading-relaxed max-w-3xl">
-          Fewer than <strong className="text-rose-400">60%</strong> of audited criteria had any quotable evidence in the source document. The strategy is grounded in mostly silent areas — treat its specificity with caution.
-          <span className="font-semibold text-slate-200 block mt-2">Suggested Action: Add deeper FinOps documentation (cost policies, cloud governance, optimization reports) and re-run.</span>
-        </p>
+    );
+  }
+
+  const isBlock = gate.decision === 'BLOCK';
+  const palette = isBlock
+    ? { border: 'border-l-rose-500', bg: 'bg-rose-950/10', dot: 'text-rose-400', label: 'text-rose-300', chip: 'bg-rose-900/40 text-rose-200 border-rose-500/30' }
+    : { border: 'border-l-amber-500', bg: 'bg-amber-950/10', dot: 'text-amber-400', label: 'text-amber-300', chip: 'bg-amber-900/40 text-amber-200 border-amber-500/30' };
+
+  const totalIssues = gate.blocking_reasons.length + gate.warnings.length;
+
+  return (
+    <div className={`glass-panel p-6 mb-8 border-l-4 ${palette.border} ${palette.bg} backdrop-blur-md`}>
+      <div className="flex items-start gap-4">
+        <div className={`p-2 rounded-full bg-slate-900/40 ${palette.dot} flex-shrink-0`}>
+          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3 flex-wrap mb-2">
+            <h4 className={`font-bold text-lg font-display ${palette.label}`}>
+              Quality Gate: {gate.decision}
+            </h4>
+            <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border uppercase tracking-wide ${palette.chip}`}>
+              {gate.blocking_reasons.length > 0 && `${gate.blocking_reasons.length} blocking`}
+              {gate.blocking_reasons.length > 0 && gate.warnings.length > 0 && ' · '}
+              {gate.warnings.length > 0 && `${gate.warnings.length} warning${gate.warnings.length === 1 ? '' : 's'}`}
+            </span>
+          </div>
+          <p className="text-sm text-slate-300 leading-relaxed mb-3">{gate.notes[0]}</p>
+          <button
+            type="button"
+            onClick={() => setExpanded(e => !e)}
+            className="text-xs font-bold uppercase tracking-wider text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            {expanded ? 'Hide details' : `Show ${totalIssues} issue${totalIssues === 1 ? '' : 's'}`}
+          </button>
+          {expanded && (
+            <div className="mt-4 space-y-3 text-sm">
+              {gate.blocking_reasons.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-rose-400 mb-2">Blocking</p>
+                  <ul className="space-y-1.5">
+                    {gate.blocking_reasons.map((r, i) => (
+                      <li key={i} className="text-slate-300 pl-3 border-l-2 border-rose-700/60">{r}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {gate.warnings.length > 0 && (
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2">Warnings</p>
+                  <ul className="space-y-1.5">
+                    {gate.warnings.map((w, i) => (
+                      <li key={i} className="text-slate-300 pl-3 border-l-2 border-amber-700/60">{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

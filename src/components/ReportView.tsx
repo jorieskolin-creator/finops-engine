@@ -1,7 +1,46 @@
 import React, { useState } from 'react';
-import { AuditItem, DiagnosticResult } from '../types';
+import { AuditItem, DiagnosticResult, QualityGateResult } from '../types';
 import { MarkdownRenderer } from './DashboardComponents';
 import { BATCH_TITLES, MASTER_BINGO_FINOPS } from '../knowledge_base';
+
+const QualityGateBlock: React.FC<{ gate: QualityGateResult }> = ({ gate }) => {
+  if (gate.decision === 'GO') {
+    return (
+      <div className="mb-8 p-4 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 text-sm">
+        <span className="font-bold">Quality Gate: GO</span> — {gate.notes[0]}
+      </div>
+    );
+  }
+  const isBlock = gate.decision === 'BLOCK';
+  return (
+    <div className={`mb-8 p-6 rounded-xl border-l-4 ${isBlock ? 'border-l-rose-600 bg-rose-50' : 'border-l-amber-600 bg-amber-50'}`}>
+      <h2 className={`text-xl font-bold mb-2 ${isBlock ? 'text-rose-800' : 'text-amber-800'}`}>
+        Quality Gate: {gate.decision}
+      </h2>
+      <p className="text-sm text-slate-700 mb-4">{gate.notes[0]}</p>
+      {gate.blocking_reasons.length > 0 && (
+        <div className="mb-4">
+          <p className="text-xs font-bold uppercase tracking-wider text-rose-700 mb-2">Blocking</p>
+          <ul className="space-y-1.5 text-sm text-slate-700">
+            {gate.blocking_reasons.map((r, i) => (
+              <li key={i} className="pl-3 border-l-2 border-rose-400">{r}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {gate.warnings.length > 0 && (
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-amber-700 mb-2">Warnings</p>
+          <ul className="space-y-1.5 text-sm text-slate-700">
+            {gate.warnings.map((w, i) => (
+              <li key={i} className="pl-3 border-l-2 border-amber-400">{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const BATCHES: Array<'A' | 'B' | 'C' | 'D' | 'E'> = ['A', 'B', 'C', 'D', 'E'];
 
@@ -151,10 +190,12 @@ export const ReportView: React.FC<ReportViewProps> = ({ result, onBack, onDownlo
       </div>
 
       <div className="max-w-4xl mx-auto px-6 py-12">
-        <div className="mb-12">
+        <div className="mb-8">
           <h1 className="text-4xl font-display font-bold text-slate-900 mb-2">FinOps Maturity Assessment</h1>
           <p className="text-slate-500">Generated: {result.meta.timestamp} | Engine: {result.meta.engine_version}</p>
         </div>
+
+        <QualityGateBlock gate={result.quality_gate} />
 
         <div className="mb-12 p-8 bg-slate-50 rounded-2xl border border-slate-200">
           <div className="flex items-center gap-4 mb-6">

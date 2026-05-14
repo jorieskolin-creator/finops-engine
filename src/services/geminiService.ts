@@ -5,6 +5,7 @@ import { knowledgeBaseService, BATCH_DEFINITIONS } from "../knowledge_base";
 import { DiagnosticResult, Phase1AuditLogs, Phase2Validation, AuditItem, EvidenceQuote } from "../types";
 import { generateSafetyAuditPrompt } from "./securityService";
 import { validatePhase1Output, validatePhase3Grounding } from "./validatorService";
+import { buildEvidenceDensityBlock, runQualityGate, EVIDENCE_DENSITY_BLOCK } from "./qualityGateService";
 import { MODEL_PHASE1, MODEL_PHASE3, GeminiThinkingConfig } from "../models";
 
 const ALL_CRITERIA_IDS = [
@@ -183,8 +184,6 @@ const calculateMetrics = (logs: Phase1AuditLogs): Phase2Validation => {
   };
 };
 
-const EVIDENCE_DENSITY_BLOCK_THRESHOLD = 30;
-
 export const analyzeDocument = async (
   text: string,
   onProgress: (stage: 'audit' | 'calc' | 'strategy', progress?: number) => void
@@ -244,7 +243,7 @@ export const analyzeDocument = async (
 
     console.log(`[FinOps] Phase 2 Complete. Readiness: ${Math.round(validationData.metrics.finops_readiness)}%, Classification: ${validationData.crawl_walk_run}`);
 
-    if (validationData.metrics.evidence_density < EVIDENCE_DENSITY_BLOCK_THRESHOLD) {
+    if (validationData.metrics.evidence_density < EVIDENCE_DENSITY_BLOCK) {
       onProgress('strategy', 100);
       return {
         meta: {
@@ -260,10 +259,11 @@ export const analyzeDocument = async (
         phase_1_audit_logs: auditLogs,
         phase_2_validation: validationData,
         phase_3_strategy: {
-          executive_summary: `**ANALYSIS ABORTED: INSUFFICIENT EVIDENCE**\n\nEvidence density ${validationData.metrics.evidence_density}% < ${EVIDENCE_DENSITY_BLOCK_THRESHOLD}% — fewer than ${Math.ceil(EVIDENCE_DENSITY_BLOCK_THRESHOLD / 2)} of 50 criteria had any quotable evidence in the source document. The audit cannot form a reliable strategy from this material. Please provide more comprehensive FinOps-relevant documentation.`,
+          executive_summary: `_Strategy generation skipped — see Quality Gate above._`,
           visual_scorecard: { headline: "Audit Inconclusive", maturity_score: "N/A", burden_score: "N/A" },
           remediation_roadmap: []
-        }
+        },
+        quality_gate: buildEvidenceDensityBlock(validationData.metrics.evidence_density)
       };
     }
 
@@ -320,6 +320,9 @@ ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}
       console.warn("[FinOps] Phase 3 grounding warnings:", groundingValidation.warnings);
     }
 
+    const qualityGate = runQualityGate(auditLogs, validationData, phase1Validation, groundingValidation);
+    console.log(`[FinOps] Quality Gate decision: ${qualityGate.decision}`);
+
     onProgress('strategy', 100);
 
     return {
@@ -339,7 +342,8 @@ ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}
         executive_summary: "Strategy incomplete.",
         visual_scorecard: { headline: "Error", maturity_score: "N/A", burden_score: "N/A" },
         remediation_roadmap: []
-      }
+      },
+      quality_gate: qualityGate
     };
 
   } catch (error) {

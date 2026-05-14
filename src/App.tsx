@@ -6,7 +6,7 @@ import { downloadReport } from './services/exportService';
 import { forensicSanitizeImport } from './services/securityService';
 import { PerformanceMonitor } from './services/debugService';
 import { DiagnosticResult, ScanResult } from './types';
-import { GaugeCard, AuditGrid, StrategicRoadmap, ComparisonChart, ReferenceLibrary, SignalWarningBanner, BenchmarkingChart, TransferProtocol, MarkdownRenderer, NeuralLoadingGrid } from './components/DashboardComponents';
+import { GaugeCard, AuditGrid, StrategicRoadmap, ComparisonChart, ReferenceLibrary, QualityGateBanner, BenchmarkingChart, TransferProtocol, MarkdownRenderer, NeuralLoadingGrid } from './components/DashboardComponents';
 import { ReportView } from './components/ReportView';
 import { LoginModal } from './components/LoginModal';
 import { checkSession, logout } from './services/authService';
@@ -475,7 +475,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                <SignalWarningBanner density={result.phase_2_validation.metrics.evidence_density} />
+                <QualityGateBanner gate={result.quality_gate} />
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="md:col-span-2 md:row-span-2">

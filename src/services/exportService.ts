@@ -1,11 +1,33 @@
 
-import { AuditItem, DiagnosticResult } from '../types';
+import { AuditItem, DiagnosticResult, QualityGateResult } from '../types';
 import { BATCH_TITLES, MASTER_BINGO_FINOPS } from '../knowledge_base';
 
 const BATCHES: Array<'A' | 'B' | 'C' | 'D' | 'E'> = ['A', 'B', 'C', 'D', 'E'];
 
 const escapeHtml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const renderQualityGate = (gate: QualityGateResult): string => {
+  if (gate.decision === 'GO') {
+    return `<div class="gate gate-go"><strong>Quality Gate: GO</strong> — ${escapeHtml(gate.notes[0] ?? '')}</div>`;
+  }
+  const cls = gate.decision === 'BLOCK' ? 'gate-block' : 'gate-warn';
+  return `
+  <div class="gate ${cls}">
+    <h2 class="gate-title">Quality Gate: ${gate.decision}</h2>
+    <p class="gate-note">${escapeHtml(gate.notes[0] ?? '')}</p>
+    ${gate.blocking_reasons.length > 0 ? `
+    <div class="gate-block-section">
+      <div class="gate-label">Blocking</div>
+      <ul>${gate.blocking_reasons.map(r => `<li>${escapeHtml(r)}</li>`).join('')}</ul>
+    </div>` : ''}
+    ${gate.warnings.length > 0 ? `
+    <div class="gate-warn-section">
+      <div class="gate-label">Warnings</div>
+      <ul>${gate.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>
+    </div>` : ''}
+  </div>`;
+};
 
 const statusBadgeClass = (status: string): string => {
   if (status === 'OK') return 'badge-ok';
@@ -121,6 +143,15 @@ const generateReportHtml = (result: DiagnosticResult): string => {
     .forensic-quotes { list-style: none; padding: 0; margin: 0; }
     .forensic-quotes li { font-size: 0.875rem; font-style: italic; color: #cbd5e1; border-left: 2px solid #475569; padding-left: 0.75rem; margin: 0.5rem 0; }
     .forensic-section { font-size: 0.75rem; color: #64748b; font-style: normal; }
+    .gate { padding: 1rem 1.25rem; border-radius: 0.75rem; margin: 1rem 0 2rem; border-left: 4px solid; }
+    .gate.gate-go { background: #052e16; border-color: #22c55e; color: #bbf7d0; font-size: 0.875rem; }
+    .gate.gate-warn { background: #451a03; border-color: #f59e0b; color: #fde68a; }
+    .gate.gate-block { background: #450a0a; border-color: #ef4444; color: #fecaca; }
+    .gate-title { font-size: 1.25rem; margin-bottom: 0.5rem; }
+    .gate-note { font-size: 0.9rem; margin-bottom: 1rem; opacity: 0.9; }
+    .gate-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; margin: 0.75rem 0 0.5rem; opacity: 0.8; }
+    .gate ul { list-style: none; padding: 0; margin: 0; }
+    .gate li { padding-left: 0.75rem; border-left: 2px solid currentColor; margin: 0.4rem 0; opacity: 0.9; font-size: 0.875rem; }
     @media print { body { background: white; color: #1e293b; } .card, .summary, .roadmap-phase, .forensic-card { border-color: #e2e8f0; background: #f8fafc; color: #1e293b; } .forensic-head h4 { color: #0f172a; } .forensic-reasoning, .forensic-quotes li { color: #334155; } }
   </style>
 </head>
@@ -130,6 +161,8 @@ const generateReportHtml = (result: DiagnosticResult): string => {
     <p>Generated: ${result.meta.timestamp} | Engine: ${result.meta.engine_version}</p>
     <p>Models: ${result.meta.model_config.phase0_phase1} (Audit) | ${result.meta.model_config.phase3} (Strategy)</p>
   </div>
+
+  ${renderQualityGate(result.quality_gate)}
 
   <h2>Maturity Classification</h2>
   <span class="classification ${cwrClass.toLowerCase().includes('crawl') ? 'crawl' : cwrClass.toLowerCase().includes('run') ? 'run' : 'walk'}">${cwrClass}</span>
