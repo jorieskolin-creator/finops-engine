@@ -116,17 +116,23 @@ export const validatePhase3Grounding = (strategyData: any, phase2: Phase2Validat
 
   const tacticIdPattern = /TAC-[A-Z]+-\d{3}/g;
   const referencedTacticIds = new Set<string>();
-  const fullText = JSON.stringify(strategy);
-  const matches = fullText.match(tacticIdPattern);
+  const roadmapText = (strategy.remediation_roadmap || [])
+    .flatMap((p: any) => p.actions || [])
+    .join('\n');
+  const matches = roadmapText.match(tacticIdPattern);
   if (matches) {
-    matches.forEach(id => referencedTacticIds.add(id));
+    matches.forEach((id: string) => referencedTacticIds.add(id));
   }
 
   const validTacticIds = new Set(FINOPS_TACTICS_LOCAL.map(t => t.id));
   for (const refId of referencedTacticIds) {
     if (!validTacticIds.has(refId)) {
-      warnings.push(`Referenced tactic ID "${refId}" not found in verified tactics database`);
+      errors.push(`Strategy cites unknown tactic ID "${refId}". Not present in tactics database.`);
     }
+  }
+
+  if (referencedTacticIds.size === 0 && allActions.length > 0) {
+    errors.push(`Strategy contains ${allActions.length} actions but cites zero tactic IDs. Phase 3 prompt requires inline [TAC-XXX-NNN] citations on every tactic-bearing action.`);
   }
 
   const summaryText = strategy.executive_summary || '';

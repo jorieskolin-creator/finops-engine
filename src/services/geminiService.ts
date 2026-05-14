@@ -313,6 +313,9 @@ ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}
     const strategyData = parseAiResponse(strategyResponse.text);
 
     const groundingValidation = validatePhase3Grounding(strategyData, validationData);
+    if (groundingValidation.errors.length > 0) {
+      console.error("[FinOps] Phase 3 grounding errors:", groundingValidation.errors);
+    }
     if (groundingValidation.warnings.length > 0) {
       console.warn("[FinOps] Phase 3 grounding warnings:", groundingValidation.warnings);
     }
