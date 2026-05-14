@@ -62,9 +62,17 @@ const renderForensicCriterion = (cat: { id: string; title: string; desc: string 
       <div class="forensic-block">
         <div class="forensic-label">Evidence</div>
         <ul class="forensic-quotes">
-          ${item.evidence_quotes.map(q => `
-            <li>&ldquo;${escapeHtml(q.quote)}&rdquo;${q.section ? `<span class="forensic-section"> — ${escapeHtml(q.section)}</span>` : ''}</li>
-          `).join('')}
+          ${item.evidence_quotes.map(q => {
+            const isImage = q.evidence_source === 'image';
+            const marker = isImage ? '<span class="forensic-img-marker" title="Image-derived evidence">[IMG]</span> ' : '';
+            const meta: string[] = [];
+            if (isImage) meta.push('visual');
+            if (q.page_number !== undefined) meta.push(`page ${q.page_number}`);
+            if (q.section) meta.push(escapeHtml(q.section));
+            if (q.category) meta.push(escapeHtml(q.category));
+            const metaHtml = meta.length > 0 ? `<span class="forensic-section"> — ${meta.join(' · ')}</span>` : '';
+            return `<li class="${isImage ? 'forensic-quote-image' : ''}">${marker}&ldquo;${escapeHtml(q.quote)}&rdquo;${metaHtml}</li>`;
+          }).join('')}
         </ul>
       </div>` : ''}
     </div>`;
@@ -188,7 +196,9 @@ const generateReportHtml = (result: DiagnosticResult): string => {
     .forensic-reasoning { font-size: 0.875rem; color: #334155; white-space: pre-line; }
     .forensic-quotes { list-style: none; padding: 0; margin: 0; }
     .forensic-quotes li { font-size: 0.875rem; font-style: italic; color: #475569; border-left: 2px solid #cbd5e1; padding-left: 0.75rem; margin: 0.5rem 0; }
+    .forensic-quotes li.forensic-quote-image { border-left-color: #c4b5fd; color: #4c1d95; background: #faf5ff; }
     .forensic-section { font-size: 0.75rem; color: #94a3b8; font-style: normal; }
+    .forensic-img-marker { display: inline-block; font-size: 0.65rem; font-weight: 700; font-style: normal; padding: 0.05rem 0.35rem; border-radius: 0.25rem; background: #ede9fe; color: #6d28d9; margin-right: 0.4rem; vertical-align: middle; }
     .gate { padding: 1.25rem 1.5rem; border-radius: 0.875rem; margin: 1rem 0 2rem; border-left: 4px solid; }
     .gate.gate-go { background: #ecfdf5; border-color: #10b981; color: #065f46; font-size: 0.875rem; }
     .gate.gate-warn { background: #fffbeb; border-color: #f59e0b; color: #92400e; }

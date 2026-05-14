@@ -23,6 +23,17 @@ export interface EvidenceQuote {
   source_document?: string;
   section?: string;
   category?: EvidenceCategory;
+  evidence_source?: 'text' | 'image';
+  page_number?: number;
+}
+
+export type ImageMimeType = 'image/png' | 'image/jpeg' | 'image/webp';
+
+export interface ImageInput {
+  mimeType: ImageMimeType;
+  data: string;
+  source_name: string;
+  page_number?: number;
 }
 
 export interface AuditItem {

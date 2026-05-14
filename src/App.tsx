@@ -1,12 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { analyzeDocument } from './services/geminiService';
 import { scanInputText, sanitizeInput } from './services/preFlightService';
-import { extractTextFromPdf } from './services/pdfService';
+import { extractTextFromPdf, extractPagesFromPdf, imageFileToInput } from './services/pdfService';
 import { downloadReport } from './services/exportService';
 import { forensicSanitizeImport } from './services/securityService';
 import { PerformanceMonitor } from './services/debugService';
 import { runFullDriftSuite } from './services/driftDetectionService';
-import { DiagnosticResult, ScanResult, PersonaId, PERSONA_IDS, PERSONA_LABELS } from './types';
+import { DiagnosticResult, ScanResult, PersonaId, PERSONA_IDS, PERSONA_LABELS, ImageInput } from './types';
 import { METRIC_DESCRIPTIONS } from './constants';
 import { GaugeCard, AuditGrid, StrategicRoadmap, ComparisonChart, ReferenceLibrary, QualityGateBanner, BenchmarkingChart, TransferProtocol, MarkdownRenderer, NeuralLoadingGrid } from './components/DashboardComponents';
 import { ReportView } from './components/ReportView';
@@ -50,6 +50,8 @@ interface UploadedFile {
   name: string;
   size: number;
   text: string;
+  images?: ImageInput[];
+  kind?: 'pdf' | 'html' | 'image';
   status: 'parsed' | 'error';
   scan?: ScanResult;
 }
@@ -93,6 +95,7 @@ const App: React.FC = () => {
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [parsing, setParsing] = useState(false);
   const [aggregatedText, setAggregatedText] = useState('');
+  const [aggregatedImages, setAggregatedImages] = useState<ImageInput[]>([]);
   const [result, setResult] = useState<DiagnosticResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingStage, setLoadingStage] = useState<'audit' | 'calc' | 'strategy' | null>(null);
@@ -123,24 +126,38 @@ const App: React.FC = () => {
   const MAX_FILE_SIZE_MB = 25;
 
   useEffect(() => {
-    const combined = files.map(f => `\n<DOCUMENT name="${f.name}">\n${f.text}\n</DOCUMENT>\n`).join('\n');
+    const combined = files
+      .filter(f => f.text && f.text.length > 0)
+      .map(f => `\n<DOCUMENT name="${f.name}">\n${f.text}\n</DOCUMENT>\n`)
+      .join('\n');
     setAggregatedText(combined);
+    const images = files.flatMap(f => f.images || []);
+    setAggregatedImages(images);
   }, [files]);
 
   useEffect(() => {
-    if (!aggregatedText) {
+    if (!aggregatedText && aggregatedImages.length === 0) {
       setScanResult({ score: 0, status: 'Insufficient', message: 'Upload Required', details: [], canRun: false });
       return;
     }
     const timer = setTimeout(() => {
       PerformanceMonitor.start('GlobalScan');
-      const globalScan = scanInputText(aggregatedText);
+      const hasImages = aggregatedImages.length > 0;
+      const globalScan = aggregatedText
+        ? scanInputText(aggregatedText)
+        : { score: 60, status: 'PassWithWarning' as const, message: 'Image-only input', details: [`${aggregatedImages.length} image(s) submitted; LLM DLP will validate relevance.`], canRun: true };
+      if (hasImages && !globalScan.canRun) {
+        globalScan.canRun = true;
+        globalScan.status = 'PassWithWarning';
+        globalScan.message = globalScan.message || 'Image content present';
+        globalScan.details = [...globalScan.details, `${aggregatedImages.length} image(s) attached; text keyword scan bypassed.`];
+      }
       const fileCountValid = files.length >= MIN_FILES && files.length <= MAX_FILES;
       if (!fileCountValid) {
         globalScan.canRun = false;
         globalScan.message = files.length < MIN_FILES ? "Need more files" : "Too many files";
       }
-      const hasJunkFile = files.some(f => f.scan && f.scan.status === 'Insufficient');
+      const hasJunkFile = files.some(f => f.kind !== 'image' && f.scan && f.scan.status === 'Insufficient');
       if (hasJunkFile) {
         globalScan.canRun = false;
         globalScan.status = 'Insufficient';
@@ -152,7 +169,7 @@ const App: React.FC = () => {
       PerformanceMonitor.end('GlobalScan');
     }, 300);
     return () => clearTimeout(timer);
-  }, [aggregatedText, files]);
+  }, [aggregatedText, aggregatedImages, files]);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files) return;
@@ -199,14 +216,26 @@ const App: React.FC = () => {
     try {
       for (const file of newFiles) {
         let text = "";
+        let images: ImageInput[] | undefined;
+        let kind: UploadedFile['kind'] = undefined;
         if (file.type === 'application/pdf') {
           if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) throw new Error(`File ${file.name} is too large.`);
-          text = await extractTextFromPdf(file);
+          const { text: pdfText, images: pdfImages } = await extractPagesFromPdf(file);
+          text = pdfText;
+          images = pdfImages;
+          kind = 'pdf';
         } else if (file.type === 'text/html') {
           const rawHtml = await file.text();
           text = extractTextFromHtml(rawHtml);
+          kind = 'html';
+        } else if (file.type.startsWith('image/')) {
+          if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) throw new Error(`Image ${file.name} is too large.`);
+          const img = await imageFileToInput(file);
+          images = [img];
+          text = `[Image input: ${file.name}]`;
+          kind = 'image';
         } else {
-          throw new Error(`File ${file.name} is not a PDF or HTML file.`);
+          throw new Error(`File ${file.name} is not a PDF, HTML, or image file.`);
         }
 
         processedFiles.push({
@@ -214,6 +243,8 @@ const App: React.FC = () => {
           name: file.name,
           size: file.size,
           text,
+          images,
+          kind,
           status: 'parsed',
           scan: scanInputText(text)
         });
@@ -229,7 +260,7 @@ const App: React.FC = () => {
 
   const removeFile = (id: string) => setFiles(files.filter(f => f.id !== id));
 
-  const runAnalyze = async (opts?: { textOverride?: string; label?: string }) => {
+  const runAnalyze = async (opts?: { textOverride?: string; imagesOverride?: ImageInput[]; label?: string }) => {
     setLoading(true);
     setLoadingStage('audit');
     setAuditProgress(0);
@@ -237,7 +268,8 @@ const App: React.FC = () => {
     PerformanceMonitor.start('FullAnalysis');
     try {
       const safeText = opts?.textOverride ?? sanitizeInput(aggregatedText);
-      const data = await analyzeDocument(safeText, (stage, progress) => {
+      const images = opts?.imagesOverride ?? aggregatedImages;
+      const data = await analyzeDocument(safeText, images, (stage, progress) => {
         setLoadingStage(stage);
         if (progress !== undefined) setAuditProgress(progress);
       });
@@ -259,7 +291,7 @@ const App: React.FC = () => {
     const combined = DRIFT_FIXTURES
       .map(f => `\n<DOCUMENT name="${f.name}">\n${f.text}\n</DOCUMENT>\n`)
       .join('\n');
-    runAnalyze({ textOverride: sanitizeInput(combined), label: DRIFT_LABEL });
+    runAnalyze({ textOverride: sanitizeInput(combined), imagesOverride: [], label: DRIFT_LABEL });
   };
 
   const startTier1Fixture = (packId: string) => {
@@ -272,7 +304,7 @@ const App: React.FC = () => {
       return;
     }
     const wrapped = `\n<DOCUMENT name="${fixture.name}">\n${fixture.text}\n</DOCUMENT>\n`;
-    runAnalyze({ textOverride: sanitizeInput(wrapped), label: `Tier 1 Fixture — ${fixture.label}` });
+    runAnalyze({ textOverride: sanitizeInput(wrapped), imagesOverride: [], label: `Tier 1 Fixture — ${fixture.label}` });
   };
 
   const startPerPackDrift = async () => {
@@ -297,7 +329,7 @@ const App: React.FC = () => {
         setPerPackCurrentLabel(fixture.label);
         console.log(`[PerPackDrift] (${i + 1}/${PER_PACK_FIXTURES.length}) ${fixture.pack_id}`);
         const safeText = sanitizeInput(`\n<DOCUMENT name="${fixture.name}">\n${fixture.text}\n</DOCUMENT>\n`);
-        const data = await analyzeDocument(safeText, () => {});
+        const data = await analyzeDocument(safeText, [], () => {});
         if (!data.phase_2_validation?.metrics) {
           throw new Error(`Analysis for ${fixture.pack_id} returned incomplete data.`);
         }
@@ -544,7 +576,7 @@ const App: React.FC = () => {
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
                       Add PDF or HTML
                     </button>
-                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept=".pdf,.html,.json" multiple />
+                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept=".pdf,.html,.json,.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" multiple />
                     <button onClick={handleAnalyze} disabled={!scanResult.canRun || files.length < MIN_FILES || files.length > MAX_FILES} className={`px-8 py-4 rounded-xl font-bold shadow-2xl transition-all transform active:scale-[0.98] flex items-center gap-3 border ${!scanResult.canRun || files.length < MIN_FILES || files.length > MAX_FILES ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed shadow-none' : 'text-slate-900 bg-white border-white hover:bg-emerald-400 hover:border-emerald-400 hover:shadow-[0_0_30px_rgba(16,185,129,0.4)]'}`}>
                       {!scanResult.canRun || files.length < MIN_FILES || files.length > MAX_FILES ? (
                         <span>{files.length < MIN_FILES ? `Add ${MIN_FILES - files.length} more files` : files.length > MAX_FILES ? "Limit Exceeded" : "Checks Failed"}</span>

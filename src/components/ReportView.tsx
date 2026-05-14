@@ -109,17 +109,27 @@ const ForensicCriterion: React.FC<{
       <div>
         <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Evidence</p>
         <ul className="space-y-2">
-          {item.evidence_quotes.map((q, i) => (
-            <li key={i} className="border-l-2 border-slate-300 pl-3 text-sm italic text-slate-600">
-              &ldquo;{q.quote}&rdquo;
-              {(q.section || q.category) && (
-                <span className="text-xs text-slate-400 not-italic">
-                  {q.section && <> — {q.section}</>}
-                  {q.category && <> · {q.category}</>}
-                </span>
-              )}
-            </li>
-          ))}
+          {item.evidence_quotes.map((q, i) => {
+            const isImage = q.evidence_source === 'image';
+            return (
+              <li key={i} className={`border-l-2 pl-3 text-sm italic ${isImage ? 'border-violet-300 text-violet-900' : 'border-slate-300 text-slate-600'}`}>
+                {isImage && (
+                  <span title="Image-derived evidence" className="inline-flex items-center justify-center w-4 h-4 mr-1.5 rounded bg-violet-100 text-violet-700 not-italic align-middle">
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  </span>
+                )}
+                &ldquo;{q.quote}&rdquo;
+                {(q.section || q.category || q.page_number || isImage) && (
+                  <span className="text-xs text-slate-400 not-italic">
+                    {isImage && <> · visual</>}
+                    {q.page_number !== undefined && <> · page {q.page_number}</>}
+                    {q.section && <> — {q.section}</>}
+                    {q.category && <> · {q.category}</>}
+                  </span>
+                )}
+              </li>
+            );
+          })}
         </ul>
       </div>
     )}
