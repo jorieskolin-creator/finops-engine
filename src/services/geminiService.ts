@@ -216,9 +216,20 @@ export const analyzeDocument = async (
       onProgress('audit', Math.round((completed / total) * 100));
     });
 
+    if (aggregatedRawData.failed_batches.length > 0) {
+      throw new Error(
+        `Phase 1 audit incomplete: ${aggregatedRawData.failed_batches.length} of 5 batches (${aggregatedRawData.failed_batches.join(', ')}) failed after retry. ` +
+        `${aggregatedRawData.failed_batches.length * 10} criteria are missing data. ` +
+        `Re-run the assessment, or check the audit model's availability.`
+      );
+    }
+
     const phase1Validation = validatePhase1Output(aggregatedRawData);
     if (!phase1Validation.valid) {
-      console.warn("[FinOps] Phase 1 validation errors:", phase1Validation.errors);
+      throw new Error(
+        `Phase 1 validation failed:\n  - ${phase1Validation.errors.join('\n  - ')}\n` +
+        `Re-run the assessment.`
+      );
     }
     if (phase1Validation.warnings.length > 0) {
       console.warn("[FinOps] Phase 1 validation warnings:", phase1Validation.warnings);

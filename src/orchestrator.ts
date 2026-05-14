@@ -51,56 +51,76 @@ const callGeminiGenerate = async (
   }
 };
 
-export const runPhase1Audit = async (text: string, onProgress: (completed: number, total: number) => void): Promise<any> => {
+export interface Phase1Result {
+  phase_1_audit_logs: {
+    maturity: Record<string, any>;
+    antipattern: Record<string, any>;
+  };
+  failed_batches: string[];
+}
+
+const runSingleBatch = async (batchId: string, text: string): Promise<{ maturity?: any; antipattern?: any }> => {
+  const definitions = BATCH_DEFINITIONS[batchId];
+  const systemInstruction = generateBatchSystemInstruction(batchId, definitions.title);
+  const userPrompt = generateBatchUserPrompt(batchId, definitions);
+
+  const response = await callGeminiGenerate(
+    MODEL_PHASE1.id,
+    [
+      {
+        role: 'user',
+        parts: [
+          { text: userPrompt },
+          { text: `\n\n<UNTRUSTED_CONTENT>\n${text}\n</UNTRUSTED_CONTENT>` }
+        ]
+      }
+    ],
+    systemInstruction,
+    MODEL_PHASE1.thinkingConfig
+  );
+
+  return parseAiResponse(response.text);
+};
+
+export const runPhase1Audit = async (text: string, onProgress: (completed: number, total: number) => void): Promise<Phase1Result> => {
   const batches = ['A', 'B', 'C', 'D', 'E'];
   const totalBatches = batches.length;
 
-  const aggregatedResults = {
+  const aggregated = {
     phase_1_audit_logs: {
       maturity: {} as Record<string, any>,
       antipattern: {} as Record<string, any>
-    }
+    },
+    failed_batches: [] as string[]
   };
 
   let completedCount = 0;
 
   const auditPromises = batches.map(async (batchId) => {
-    try {
-      const definitions = BATCH_DEFINITIONS[batchId];
-      const systemInstruction = generateBatchSystemInstruction(batchId, definitions.title);
-      const userPrompt = generateBatchUserPrompt(batchId, definitions);
-
-      const response = await callGeminiGenerate(
-        MODEL_PHASE1.id,
-        [
-          {
-            role: 'user',
-            parts: [
-              { text: userPrompt },
-              { text: `\n\n<UNTRUSTED_CONTENT>\n${text}\n</UNTRUSTED_CONTENT>` }
-            ]
-          }
-        ],
-        systemInstruction,
-        MODEL_PHASE1.thinkingConfig
-      );
-
+    let lastError: unknown = null;
+    for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const batchResult = parseAiResponse(response.text);
-        if (batchResult.maturity) Object.assign(aggregatedResults.phase_1_audit_logs.maturity, batchResult.maturity);
-        if (batchResult.antipattern) Object.assign(aggregatedResults.phase_1_audit_logs.antipattern, batchResult.antipattern);
-      } catch (parseError) {
-        console.error(`[FinOps] Error Parsing Batch ${batchId}:`, parseError);
+        const batchResult = await runSingleBatch(batchId, text);
+        if (batchResult.maturity) Object.assign(aggregated.phase_1_audit_logs.maturity, batchResult.maturity);
+        if (batchResult.antipattern) Object.assign(aggregated.phase_1_audit_logs.antipattern, batchResult.antipattern);
+        if (!batchResult.maturity && !batchResult.antipattern) {
+          throw new Error('Batch returned empty result (no maturity or antipattern keys).');
+        }
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error;
+        console.warn(`[FinOps] Batch ${batchId} attempt ${attempt} failed:`, error);
       }
-
-    } catch (error) {
-      console.error(`[FinOps] Error processing Batch ${batchId}:`, error);
-    } finally {
-      completedCount++;
-      onProgress(completedCount, totalBatches);
     }
+    if (lastError) {
+      console.error(`[FinOps] Batch ${batchId} failed after retry. Marking as failed.`);
+      aggregated.failed_batches.push(batchId);
+    }
+    completedCount++;
+    onProgress(completedCount, totalBatches);
   });
 
   await Promise.all(auditPromises);
-  return aggregatedResults;
+  return aggregated;
 };
