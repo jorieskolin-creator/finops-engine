@@ -10,6 +10,7 @@ interface GaugeProps {
   trend?: 'positive' | 'negative';
   size?: 'small' | 'large';
   subLabel?: string;
+  description?: string;
 }
 
 interface AuditGridProps {
@@ -384,7 +385,7 @@ export const QualityGateBanner: React.FC<{ gate: QualityGateResult }> = ({ gate 
   );
 };
 
-export const GaugeCard: React.FC<GaugeProps> = ({ value, label, color, trend = 'positive', size = 'small', subLabel }) => {
+export const GaugeCard: React.FC<GaugeProps> = ({ value, label, color, trend = 'positive', size = 'small', subLabel, description }) => {
   const radius = size === 'large' ? 60 : 36;
   const stroke = size === 'large' ? 8 : 5;
   const normalizedValue = Math.min(Math.max(value, 0), 100);
@@ -407,6 +408,11 @@ export const GaugeCard: React.FC<GaugeProps> = ({ value, label, color, trend = '
       </div>
       <h3 className={`uppercase tracking-widest text-slate-400 font-bold border-t border-white/5 pt-4 w-full text-center ${size === 'large' ? 'text-sm mt-2' : 'text-[10px]'}`}>{label}</h3>
       {subLabel && <p className="text-slate-500 text-[10px] mt-1 font-medium">{subLabel}</p>}
+      {description && (
+        <p className={`text-slate-400 mt-2 px-1 text-center leading-snug ${size === 'large' ? 'text-xs max-w-xs' : 'text-[10px] max-w-[14rem]'}`}>
+          {description}
+        </p>
+      )}
       <div className={`mt-3 text-[9px] font-bold uppercase tracking-wider text-slate-400 opacity-80 bg-white/5 px-3 py-1 rounded-full border border-white/5 ${size === 'large' ? 'scale-110' : ''}`}>
         {trend === 'positive' ? 'Target: High' : 'Target: Low'}
       </div>

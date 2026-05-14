@@ -1,4 +1,21 @@
 
+export const METRIC_DESCRIPTIONS: Record<string, string> = {
+  finops_readiness:
+    'Composite score combining maturity points earned and anti-pattern burden, normalized to 0–100. Higher = closer to embedded FinOps practice.',
+  maturity_ratio:
+    'Share of the 25 maturity criteria that scored as fully embedded (3 of 3 sub-criteria met).',
+  maturity_depth:
+    'Average maturity score across all 25 criteria on a 0–3 scale, normalized to 0–100%. Captures partial progress that maturity_ratio misses.',
+  antipattern_ratio:
+    'Share of the 25 anti-patterns scored as deeply entrenched (3 of 3 sub-criteria met). Higher = worse.',
+  antipattern_burden:
+    'Average severity across all 25 anti-patterns. Higher = more friction blocking current FinOps practice.',
+  delivery_integrity:
+    'Did the audit pipeline complete? Share of 50 criteria the LLM returned valid data for. Below 100% means batches failed.',
+  evidence_density:
+    'Did the source actually say anything? Share of 50 criteria where the audit captured at least one quotable evidence excerpt from the source document.'
+};
+
 export const FINOPS_METHODOLOGY_CONTEXT = `
 <methodology_phases>
 The FinOps maturity journey is guided by the "Crawl-Walk-Run" framework:

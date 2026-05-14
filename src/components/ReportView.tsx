@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AuditItem, DiagnosticResult, QualityGateResult } from '../types';
 import { MarkdownRenderer } from './DashboardComponents';
 import { BATCH_TITLES, MASTER_BINGO_FINOPS } from '../knowledge_base';
+import { METRIC_DESCRIPTIONS } from '../constants';
 
 const QualityGateBlock: React.FC<{ gate: QualityGateResult }> = ({ gate }) => {
   if (gate.decision === 'GO') {
@@ -223,22 +224,26 @@ export const ReportView: React.FC<ReportViewProps> = ({ result, onBack, onDownlo
             </span>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">FinOps Readiness</p>
               <p className="text-3xl font-bold text-emerald-600">{Math.round(m.finops_readiness)}%</p>
+              <p className="text-xs text-slate-500 mt-1 leading-snug">{METRIC_DESCRIPTIONS.finops_readiness}</p>
             </div>
             <div>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Maturity Depth</p>
               <p className="text-3xl font-bold text-teal-600">{Math.round(m.maturity_depth)}%</p>
+              <p className="text-xs text-slate-500 mt-1 leading-snug">{METRIC_DESCRIPTIONS.maturity_depth}</p>
             </div>
             <div>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Anti-Pattern Burden</p>
               <p className="text-3xl font-bold text-rose-600">{Math.round(m.antipattern_burden)}%</p>
+              <p className="text-xs text-slate-500 mt-1 leading-snug">{METRIC_DESCRIPTIONS.antipattern_burden}</p>
             </div>
             <div>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Maturity Ratio</p>
               <p className="text-3xl font-bold text-violet-600">{Math.round(m.maturity_ratio)}%</p>
+              <p className="text-xs text-slate-500 mt-1 leading-snug">{METRIC_DESCRIPTIONS.maturity_ratio}</p>
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 
 import { AuditItem, DiagnosticResult, QualityGateResult } from '../types';
 import { BATCH_TITLES, MASTER_BINGO_FINOPS } from '../knowledge_base';
+import { METRIC_DESCRIPTIONS } from '../constants';
 
 const BATCHES: Array<'A' | 'B' | 'C' | 'D' | 'E'> = ['A', 'B', 'C', 'D', 'E'];
 
@@ -118,6 +119,7 @@ const generateReportHtml = (result: DiagnosticResult): string => {
     .card { background: #1e293b; border: 1px solid #334155; border-radius: 1rem; padding: 1.5rem; }
     .card-label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: #94a3b8; margin-bottom: 0.5rem; }
     .card-value { font-size: 2rem; font-weight: 700; }
+    .card-desc { font-size: 0.75rem; color: #94a3b8; margin-top: 0.5rem; line-height: 1.4; }
     .positive { color: #06b6d4; }
     .negative { color: #f43f5e; }
     .neutral { color: #a855f7; }
@@ -176,11 +178,11 @@ const generateReportHtml = (result: DiagnosticResult): string => {
 
   <h2>Key Metrics</h2>
   <div class="scorecard">
-    <div class="card"><div class="card-label">FinOps Readiness</div><div class="card-value positive">${Math.round(m.finops_readiness)}%</div></div>
-    <div class="card"><div class="card-label">Maturity Depth</div><div class="card-value neutral">${Math.round(m.maturity_depth)}%</div></div>
-    <div class="card"><div class="card-label">Anti-Pattern Burden</div><div class="card-value negative">${Math.round(m.antipattern_burden)}%</div></div>
-    <div class="card"><div class="card-label">Delivery Integrity</div><div class="card-value">${m.delivery_integrity}%</div></div>
-    <div class="card"><div class="card-label">Evidence Density</div><div class="card-value">${m.evidence_density}%</div></div>
+    <div class="card"><div class="card-label">FinOps Readiness</div><div class="card-value positive">${Math.round(m.finops_readiness)}%</div><div class="card-desc">${escapeHtml(METRIC_DESCRIPTIONS.finops_readiness)}</div></div>
+    <div class="card"><div class="card-label">Maturity Depth</div><div class="card-value neutral">${Math.round(m.maturity_depth)}%</div><div class="card-desc">${escapeHtml(METRIC_DESCRIPTIONS.maturity_depth)}</div></div>
+    <div class="card"><div class="card-label">Anti-Pattern Burden</div><div class="card-value negative">${Math.round(m.antipattern_burden)}%</div><div class="card-desc">${escapeHtml(METRIC_DESCRIPTIONS.antipattern_burden)}</div></div>
+    <div class="card"><div class="card-label">Delivery Integrity</div><div class="card-value">${m.delivery_integrity}%</div><div class="card-desc">${escapeHtml(METRIC_DESCRIPTIONS.delivery_integrity)}</div></div>
+    <div class="card"><div class="card-label">Evidence Density</div><div class="card-value">${m.evidence_density}%</div><div class="card-desc">${escapeHtml(METRIC_DESCRIPTIONS.evidence_density)}</div></div>
   </div>
 
   <h2>Executive Summary</h2>
