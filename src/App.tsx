@@ -504,6 +504,12 @@ const App: React.FC = () => {
             {!loading ? (
               <>
                 <div className="text-center mb-16 relative">
+                  <div className="mb-5 flex justify-center">
+                    <span className="inline-flex items-center gap-2 text-[10px] md:text-xs font-bold uppercase tracking-[0.3em] text-amber-300 bg-amber-500/10 border border-amber-400/40 px-4 py-1.5 rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                      DEMO
+                    </span>
+                  </div>
                   <h2 className="text-6xl md:text-8xl font-display font-black text-white mb-6 tracking-tight leading-[0.9] drop-shadow-xl">
                     FinOps <br />
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 animate-gradient-x drop-shadow-none filter brightness-110">Assessment Engine</span>
