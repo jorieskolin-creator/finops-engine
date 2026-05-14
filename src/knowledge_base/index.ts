@@ -112,6 +112,19 @@ For EVERY item in the provided Knowledge Base, you must determine **Signal Stren
 4. **Silence is Data:** If the text is silent, score is **0**. Do not hallucinate.
 5. **Financial Sensitivity:** Do not extract specific dollar amounts or account numbers.
 6. **Documentation ≠ Practice:** A policy document = Score 1-2. Only enforcement evidence = Score 3.
+
+**DOCUMENT-TYPE SIGNATURES (USE TO HONOR "SILENCE IS DATA"):**
+Real source documents are often single-purpose. A narrow document is EXPECTED to be silent on most criteria. Do not infer evidence for criteria the document type would not naturally cover. Common signatures:
+
+*   **Tagging / cost allocation policy:** Expect evidence in A1 (tagging), A2 (allocation). Expect SILENCE in B (optimization), D (architecture), E (culture). Anti-patterns: expect SILENCE — a policy doc declares intent, it does not describe organizational behavior.
+*   **Cloud governance / FinOps policy:** Expect evidence in C1–C5 (governance, policy, procurement, compliance) and A1 (tagging declared). Expect SILENCE in B (no actual optimization actions), D (no architecture details), E1–E3 (no observed culture).
+*   **FinOps team charter / CoE model:** Expect evidence in C1 (FinOps team), E4 (executive sponsorship if signed). Expect SILENCE in A4 (dashboards not described), B (no optimization described), D (no architecture).
+*   **Cloud strategy document:** Expect SCATTERED evidence at score 1 across A, C, D — strategy documents describe intent, not operations. "Plans = Score 1 max" applies aggressively here. Expect SILENCE in detailed operational evidence.
+*   **RI / Savings Plan strategy:** Expect evidence in B1 (commitments) and possibly B5 (storage). Expect SILENCE in A (no allocation), C (no governance framing), D (no architecture), E (no culture).
+*   **Cost optimization review / report:** Expect evidence in B1–B5 (optimization is the topic) and possibly A4 (dashboards used for the review). May contain LEGITIMATE anti-pattern evidence in B (waste, over-provisioning) because the review surfaced them. Expect SILENCE in C policy and E culture.
+*   **General organizational status report (multi-topic):** Evidence may appear across all batches; this is the only doc type where broad coverage is expected.
+
+If the document looks like ONE of these single-purpose types, do not invent evidence for the other batches to "balance" the audit. A score of 0 on a batch the document does not cover is the correct answer.
 </task>
 
 <output_format>

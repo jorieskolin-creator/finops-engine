@@ -14,6 +14,12 @@ import { checkSession, logout } from './services/authService';
 import goldenCrawl from '../test/golden-crawl.txt?raw';
 import goldenWalk from '../test/golden-walk.txt?raw';
 import goldenRun from '../test/golden-run.txt?raw';
+import tier1GovernancePolicy from '../test/tier1-governance-policy.txt?raw';
+import tier1TaggingPolicy from '../test/tier1-tagging-policy.txt?raw';
+import tier1CoeCharter from '../test/tier1-coe-charter.txt?raw';
+import tier1CloudStrategy from '../test/tier1-cloud-strategy.txt?raw';
+import tier1RiSpStrategy from '../test/tier1-ri-sp-strategy.txt?raw';
+import tier1CostOptReview from '../test/tier1-cost-optimization-review.txt?raw';
 
 const DRIFT_FIXTURES = [
   { name: 'golden-crawl.txt', text: goldenCrawl },
@@ -21,6 +27,15 @@ const DRIFT_FIXTURES = [
   { name: 'golden-run.txt', text: goldenRun },
 ];
 const DRIFT_LABEL = 'Drift Test — Combined Golden Fixtures';
+
+const TIER1_FIXTURES: Array<{ pack_id: string; name: string; label: string; text: string }> = [
+  { pack_id: 'tier1-governance-policy', name: 'tier1-governance-policy.txt', label: 'Cloud Governance / FinOps Policy', text: tier1GovernancePolicy },
+  { pack_id: 'tier1-tagging-policy', name: 'tier1-tagging-policy.txt', label: 'Tagging & Cost Allocation Policy', text: tier1TaggingPolicy },
+  { pack_id: 'tier1-coe-charter', name: 'tier1-coe-charter.txt', label: 'FinOps CoE Charter', text: tier1CoeCharter },
+  { pack_id: 'tier1-cloud-strategy', name: 'tier1-cloud-strategy.txt', label: 'Cloud Strategy (3-Year Plan)', text: tier1CloudStrategy },
+  { pack_id: 'tier1-ri-sp-strategy', name: 'tier1-ri-sp-strategy.txt', label: 'RI / Savings Plan Strategy', text: tier1RiSpStrategy },
+  { pack_id: 'tier1-cost-optimization-review', name: 'tier1-cost-optimization-review.txt', label: 'Quarterly Cost Optimization Review', text: tier1CostOptReview }
+];
 
 interface UploadedFile {
   id: string;
@@ -233,6 +248,19 @@ const App: React.FC = () => {
     runAnalyze({ textOverride: sanitizeInput(combined), label: DRIFT_LABEL });
   };
 
+  const startTier1Fixture = (packId: string) => {
+    if (loading) return;
+    const fixture = TIER1_FIXTURES.find(f => f.pack_id === packId);
+    if (!fixture) return;
+    if (!authenticated) {
+      pendingDriftRef.current = true;
+      setShowLogin(true);
+      return;
+    }
+    const wrapped = `\n<DOCUMENT name="${fixture.name}">\n${fixture.text}\n</DOCUMENT>\n`;
+    runAnalyze({ textOverride: sanitizeInput(wrapped), label: `Tier 1 Fixture — ${fixture.label}` });
+  };
+
   const handleAnalyze = async () => {
     if (!aggregatedText || !scanResult.canRun) return;
     if (!authenticated) {
@@ -327,6 +355,20 @@ const App: React.FC = () => {
               >
                 Drift Test
               </button>
+            )}
+
+            {authenticated && !loading && !result && (
+              <select
+                onChange={(e) => { if (e.target.value) { startTier1Fixture(e.target.value); e.target.value = ''; } }}
+                defaultValue=""
+                className="text-xs font-bold uppercase tracking-widest text-sky-300 hover:text-white bg-sky-950/30 hover:bg-sky-700/40 border border-sky-700/40 hover:border-sky-400 transition-colors px-4 py-2 rounded-lg cursor-pointer"
+                title="Run the assessment against a single Tier 1 document-type fixture to test narrow-doc behavior"
+              >
+                <option value="" disabled>Tier 1 Fixture…</option>
+                {TIER1_FIXTURES.map(f => (
+                  <option key={f.pack_id} value={f.pack_id}>{f.label}</option>
+                ))}
+              </select>
             )}
 
             {(result || files.length > 0) && (
