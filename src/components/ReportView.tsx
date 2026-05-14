@@ -3,6 +3,11 @@ import { AuditItem, DiagnosticResult, QualityGateResult } from '../types';
 import { MarkdownRenderer } from './DashboardComponents';
 import { BATCH_TITLES, MASTER_BINGO_FINOPS } from '../knowledge_base';
 import { METRIC_DESCRIPTIONS } from '../constants';
+import { SVG_CSS, svgGaugeCard, svgRadar, svgScatter } from '../services/svgChartService';
+
+const InlineSvg: React.FC<{ html: string; className?: string }> = ({ html, className }) => (
+  <div className={className} dangerouslySetInnerHTML={{ __html: html }} />
+);
 
 const QualityGateBlock: React.FC<{ gate: QualityGateResult }> = ({ gate }) => {
   if (gate.decision === 'GO') {
@@ -191,8 +196,19 @@ export const ReportView: React.FC<ReportViewProps> = ({ result, onBack, onDownlo
   const m = result.phase_2_validation.metrics;
   const cwrClass = result.phase_2_validation.crawl_walk_run;
 
+  const gauges = [
+    { value: m.finops_readiness, label: 'FinOps Readiness', color: '#10b981', description: METRIC_DESCRIPTIONS.finops_readiness, trend: 'positive' as const, size: 'large' as const },
+    { value: m.maturity_ratio, label: 'Maturity Level', color: '#14b8a6', description: METRIC_DESCRIPTIONS.maturity_ratio, trend: 'positive' as const },
+    { value: m.maturity_depth, label: 'Maturity Depth', color: '#06b6d4', description: METRIC_DESCRIPTIONS.maturity_depth, trend: 'positive' as const },
+    { value: m.antipattern_ratio, label: 'Anti-Pattern Level', color: '#f43f5e', description: METRIC_DESCRIPTIONS.antipattern_ratio, trend: 'negative' as const },
+    { value: m.antipattern_burden, label: 'Anti-Pattern Burden', color: '#e11d48', description: METRIC_DESCRIPTIONS.antipattern_burden, trend: 'negative' as const },
+    { value: m.delivery_integrity, label: 'Delivery Integrity', color: '#475569', description: METRIC_DESCRIPTIONS.delivery_integrity, trend: 'positive' as const },
+    { value: m.evidence_density, label: 'Evidence Density', color: '#475569', description: METRIC_DESCRIPTIONS.evidence_density, trend: 'positive' as const }
+  ];
+
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
+      <style>{SVG_CSS}</style>
       <div className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-4xl mx-auto px-6 py-4 flex justify-between items-center">
           <button onClick={onBack} className="text-sm font-bold text-slate-500 hover:text-slate-900 flex items-center gap-2">
@@ -244,6 +260,35 @@ export const ReportView: React.FC<ReportViewProps> = ({ result, onBack, onDownlo
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Maturity Ratio</p>
               <p className="text-3xl font-bold text-violet-600">{Math.round(m.maturity_ratio)}%</p>
               <p className="text-xs text-slate-500 mt-1 leading-snug">{METRIC_DESCRIPTIONS.maturity_ratio}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-12">
+          <h2 className="text-2xl font-display font-bold text-slate-900 mb-6 pb-3 border-b border-slate-200">Maturity Gauges</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-stretch">
+            {gauges.map((g, i) => (
+              <InlineSvg
+                key={g.label}
+                html={svgGaugeCard(g)}
+                className={i === 0 ? 'col-span-2 md:col-span-3' : ''}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-12">
+          <h2 className="text-2xl font-display font-bold text-slate-900 mb-6 pb-3 border-b border-slate-200">Visual Diagnosis</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="chart-card">
+              <h3>Category Footprint</h3>
+              <p className="chart-desc">Per-domain maturity (emerald) vs anti-pattern burden (rose). Each axis is one of the five batches; values are the sum of sub-criterion counts (0–15) for that batch.</p>
+              <InlineSvg html={svgRadar(result.phase_1_audit_logs)} />
+            </div>
+            <div className="chart-card">
+              <h3>Position vs. Quadrants</h3>
+              <p className="chart-desc">FinOps Readiness (x-axis) plotted against Anti-Pattern Burden (y-axis). The bottom-right quadrant is the goal: high readiness, low burden.</p>
+              <InlineSvg html={svgScatter(m.finops_readiness, m.antipattern_burden)} />
             </div>
           </div>
         </div>
