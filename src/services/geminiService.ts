@@ -5,7 +5,12 @@ import { knowledgeBaseService, BATCH_DEFINITIONS } from "../knowledge_base";
 import { DiagnosticResult, Phase1AuditLogs, Phase2Validation, AuditItem, EvidenceQuote } from "../types";
 import { generateSafetyAuditPrompt } from "./securityService";
 import { validatePhase1Output, validatePhase3Grounding } from "./validatorService";
+import { buildEvidenceDensityBlock, runQualityGate, EVIDENCE_DENSITY_BLOCK } from "./qualityGateService";
+import { buildFactCheckPrompt, buildRegenerateAppendix, parseFactCheckResponse } from "./factCheckService";
+import { FactCheckClaim, FactCheckResult } from "../types";
 import { MODEL_PHASE1, MODEL_PHASE3, GeminiThinkingConfig } from "../models";
+
+const FACT_CHECK_MAX_RETRIES = 2;
 
 const ALL_CRITERIA_IDS = [
   'A1', 'A2', 'A3', 'A4', 'A5',
@@ -110,13 +115,19 @@ const validateAndSanitizeLogs = (rawData: any): Phase1AuditLogs => {
 const calculateMetrics = (logs: Phase1AuditLogs): Phase2Validation => {
   let maturityCount = 0; let maturitySum = 0; const maturityGaps: string[] = [];
   let antipatternCount = 0; let antipatternSum = 0; const antipatternFindings: string[] = [];
-  let validItemsFound = 0;
+  let deliveredItems = 0;
+  let itemsWithEvidence = 0;
   const silentAreas: string[] = [];
   const categoryScores: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, E: 0 };
 
+  const tally = (item: AuditItem) => {
+    if (item.count !== -1) deliveredItems++;
+    if (item.evidence_quotes && item.evidence_quotes.length > 0) itemsWithEvidence++;
+  };
+
   Object.entries(logs.maturity).forEach(([key, rawItem]) => {
     const item = rawItem as AuditItem;
-    if (item.count !== -1) validItemsFound++;
+    tally(item);
     maturitySum += Math.max(item.count, 0);
     if (item.status === 'OK') maturityCount++;
     const catPrefix = key.charAt(0);
@@ -129,7 +140,7 @@ const calculateMetrics = (logs: Phase1AuditLogs): Phase2Validation => {
 
   Object.entries(logs.antipattern).forEach(([key, rawItem]) => {
     const item = rawItem as AuditItem;
-    if (item.count !== -1) validItemsFound++;
+    tally(item);
     antipatternSum += Math.max(item.count, 0);
     if (item.status === 'NOK') antipatternCount++;
     if (item.count > 0) {
@@ -137,8 +148,8 @@ const calculateMetrics = (logs: Phase1AuditLogs): Phase2Validation => {
     }
   });
 
-  const coverageRatio = validItemsFound / 50;
-  const signalStrength = Math.round(coverageRatio * 100);
+  const delivery_integrity = Math.round((deliveredItems / 50) * 100);
+  const evidence_density = Math.round((itemsWithEvidence / 50) * 100);
 
   const maturity_ratio = (maturityCount / 25) * 100;
   const maturity_depth = (maturitySum / 75) * 100;
@@ -162,7 +173,8 @@ const calculateMetrics = (logs: Phase1AuditLogs): Phase2Validation => {
       maturity_depth,
       antipattern_burden,
       finops_readiness,
-      signal_strength: signalStrength
+      delivery_integrity,
+      evidence_density
     },
     raw_counts: {
       maturity_sub_criteria_met: maturitySum,
@@ -175,8 +187,6 @@ const calculateMetrics = (logs: Phase1AuditLogs): Phase2Validation => {
     crawl_walk_run
   };
 };
-
-const SIGNAL_THRESHOLD = 85;
 
 export const analyzeDocument = async (
   text: string,
@@ -209,9 +219,20 @@ export const analyzeDocument = async (
       onProgress('audit', Math.round((completed / total) * 100));
     });
 
+    if (aggregatedRawData.failed_batches.length > 0) {
+      throw new Error(
+        `Phase 1 audit incomplete: ${aggregatedRawData.failed_batches.length} of 5 batches (${aggregatedRawData.failed_batches.join(', ')}) failed after retry. ` +
+        `${aggregatedRawData.failed_batches.length * 10} criteria are missing data. ` +
+        `Re-run the assessment, or check the audit model's availability.`
+      );
+    }
+
     const phase1Validation = validatePhase1Output(aggregatedRawData);
     if (!phase1Validation.valid) {
-      console.warn("[FinOps] Phase 1 validation errors:", phase1Validation.errors);
+      throw new Error(
+        `Phase 1 validation failed:\n  - ${phase1Validation.errors.join('\n  - ')}\n` +
+        `Re-run the assessment.`
+      );
     }
     if (phase1Validation.warnings.length > 0) {
       console.warn("[FinOps] Phase 1 validation warnings:", phase1Validation.warnings);
@@ -226,7 +247,7 @@ export const analyzeDocument = async (
 
     console.log(`[FinOps] Phase 2 Complete. Readiness: ${Math.round(validationData.metrics.finops_readiness)}%, Classification: ${validationData.crawl_walk_run}`);
 
-    if (validationData.metrics.signal_strength < SIGNAL_THRESHOLD) {
+    if (validationData.metrics.evidence_density < EVIDENCE_DENSITY_BLOCK) {
       onProgress('strategy', 100);
       return {
         meta: {
@@ -242,10 +263,11 @@ export const analyzeDocument = async (
         phase_1_audit_logs: auditLogs,
         phase_2_validation: validationData,
         phase_3_strategy: {
-          executive_summary: `**ANALYSIS ABORTED: LOW DATA INTEGRITY**\n\nSignal Strength ${Math.round(validationData.metrics.signal_strength)}% < ${SIGNAL_THRESHOLD}%. The AI could not verify enough FinOps criteria to form a safe strategy. Please provide more comprehensive FinOps-relevant documentation.`,
+          executive_summary: `_Strategy generation skipped — see Quality Gate above._`,
           visual_scorecard: { headline: "Audit Inconclusive", maturity_score: "N/A", burden_score: "N/A" },
           remediation_roadmap: []
-        }
+        },
+        quality_gate: buildEvidenceDensityBlock(validationData.metrics.evidence_density)
       };
     }
 
@@ -264,7 +286,8 @@ FinOps Readiness Score: ${Math.round(validationData.metrics.finops_readiness)}/1
 Maturity Classification: ${validationData.crawl_walk_run}
 Maturity Depth Index: ${Math.round(validationData.metrics.maturity_depth)}%
 Anti-Pattern Burden: ${Math.round(validationData.metrics.antipattern_burden)}%
-Signal Strength: ${Math.round(validationData.metrics.signal_strength)}%
+Delivery Integrity: ${validationData.metrics.delivery_integrity}% (criteria the audit returned data for)
+Evidence Density: ${validationData.metrics.evidence_density}% (criteria with quotable evidence from source)
 Anti-Pattern Findings: ${validationData.antipattern_findings.length}
 Maturity Gaps: ${validationData.maturity_gaps.length}
 Silent Areas: ${validationData.silent_areas.length}
@@ -273,30 +296,90 @@ CATEGORY BREAKDOWN:
 ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}: ${score}/15`).join('\n')}
 `;
 
-    const strategyResponse = await callGeminiGenerate(
-      MODEL_PHASE3.id,
-      [
-        {
-          role: 'user',
-          parts: [
-            { text: STRATEGY_USER_PROMPT },
-            { text: `\n\n### THE GOLDEN STANDARD (SSOT)\nYou must ignore generic internet advice. You may ONLY prescribe solutions found in this Knowledge Base:\n\n${fullSSOT}` },
-            { text: `\n\n### DIAGNOSTIC FINDINGS (Phase 1 & 2)\nUse these specific gaps and anti-patterns to trigger the strategies above:\n${handoffSummary}` },
-            { text: `\n\n### ORIGINAL SOURCE CONTEXT\n<SOURCE_DOCUMENT_TO_AUDIT>\n${text.substring(0, 50000)}\n</SOURCE_DOCUMENT_TO_AUDIT>` }
-          ]
-        }
-      ],
-      STRATEGY_SYSTEM_INSTRUCTION,
-      MODEL_PHASE3.thinkingConfig
-    );
+    const callPhase3 = async (correctionAppendix?: string): Promise<any> => {
+      const parts: Array<{ text: string }> = [
+        { text: STRATEGY_USER_PROMPT },
+        { text: `\n\n### THE GOLDEN STANDARD (SSOT)\nYou must ignore generic internet advice. You may ONLY prescribe solutions found in this Knowledge Base:\n\n${fullSSOT}` },
+        { text: `\n\n### DIAGNOSTIC FINDINGS (Phase 1 & 2)\nUse these specific gaps and anti-patterns to trigger the strategies above:\n${handoffSummary}` },
+        { text: `\n\n### ORIGINAL SOURCE CONTEXT\n<SOURCE_DOCUMENT_TO_AUDIT>\n${text.substring(0, 50000)}\n</SOURCE_DOCUMENT_TO_AUDIT>` }
+      ];
+      if (correctionAppendix) parts.push({ text: correctionAppendix });
+      const resp = await callGeminiGenerate(
+        MODEL_PHASE3.id,
+        [{ role: 'user', parts }],
+        STRATEGY_SYSTEM_INSTRUCTION,
+        MODEL_PHASE3.thinkingConfig
+      );
+      return parseAiResponse(resp.text);
+    };
+
+    const runFactCheck = async (data: any, attemptNumber: number): Promise<FactCheckResult> => {
+      const summary = data?.phase_3_strategy?.executive_summary || '';
+      const roadmap = data?.phase_3_strategy?.remediation_roadmap || [];
+      const roadmapText = roadmap.flatMap((p: any) => Array.isArray(p.actions) ? p.actions : []).join('\n');
+      try {
+        const fcPrompt = buildFactCheckPrompt({
+          executiveSummary: summary,
+          remediationRoadmapText: roadmapText,
+          sourceDocument: text,
+          phase1: auditLogs,
+          phase2: validationData
+        });
+        const fcResp = await callGeminiGenerate(
+          MODEL_PHASE1.id,
+          [{ role: 'user', parts: [{ text: fcPrompt }] }],
+          undefined,
+          MODEL_PHASE1.thinkingConfig
+        );
+        return parseFactCheckResponse(fcResp.text, attemptNumber);
+      } catch (e: any) {
+        return {
+          attempts: attemptNumber,
+          total_claims: 0,
+          supported_count: 0,
+          unsupported_claims: [],
+          failed: true,
+          failure_reason: `Fact-check call failed: ${e?.message || e}`
+        };
+      }
+    };
+
+    let strategyData: any = await callPhase3();
+    onProgress('strategy', 70);
+    let factCheck = await runFactCheck(strategyData, 1);
+    let lastUnsupported: FactCheckClaim[] = factCheck.unsupported_claims;
+
+    let attempt = 1;
+    while (
+      !factCheck.failed &&
+      lastUnsupported.length > 0 &&
+      attempt <= FACT_CHECK_MAX_RETRIES
+    ) {
+      console.log(`[FinOps] Fact-check pass ${attempt}: ${lastUnsupported.length} unsupported claims, regenerating...`);
+      strategyData = await callPhase3(buildRegenerateAppendix(lastUnsupported));
+      attempt++;
+      factCheck = await runFactCheck(strategyData, attempt);
+      lastUnsupported = factCheck.unsupported_claims;
+    }
+
+    if (factCheck.failed) {
+      console.warn(`[FinOps] Fact-check unavailable: ${factCheck.failure_reason}`);
+    } else {
+      console.log(`[FinOps] Fact-check complete after ${factCheck.attempts} pass(es): ${factCheck.supported_count}/${factCheck.total_claims} claims supported, ${lastUnsupported.length} unsupported.`);
+    }
 
     onProgress('strategy', 90);
-    const strategyData = parseAiResponse(strategyResponse.text);
 
     const groundingValidation = validatePhase3Grounding(strategyData, validationData);
+    if (groundingValidation.errors.length > 0) {
+      console.error("[FinOps] Phase 3 grounding errors:", groundingValidation.errors);
+    }
     if (groundingValidation.warnings.length > 0) {
       console.warn("[FinOps] Phase 3 grounding warnings:", groundingValidation.warnings);
     }
+
+    const qualityGate = runQualityGate(auditLogs, validationData, phase1Validation, groundingValidation, factCheck);
+    console.log(`[FinOps] Quality Gate decision: ${qualityGate.decision}`);
 
     onProgress('strategy', 100);
 
@@ -317,7 +400,8 @@ ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}
         executive_summary: "Strategy incomplete.",
         visual_scorecard: { headline: "Error", maturity_score: "N/A", burden_score: "N/A" },
         remediation_roadmap: []
-      }
+      },
+      quality_gate: qualityGate
     };
 
   } catch (error) {

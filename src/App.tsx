@@ -6,7 +6,8 @@ import { downloadReport } from './services/exportService';
 import { forensicSanitizeImport } from './services/securityService';
 import { PerformanceMonitor } from './services/debugService';
 import { DiagnosticResult, ScanResult } from './types';
-import { GaugeCard, AuditGrid, StrategicRoadmap, ComparisonChart, ReferenceLibrary, SignalWarningBanner, BenchmarkingChart, TransferProtocol, MarkdownRenderer, NeuralLoadingGrid } from './components/DashboardComponents';
+import { METRIC_DESCRIPTIONS } from './constants';
+import { GaugeCard, AuditGrid, StrategicRoadmap, ComparisonChart, ReferenceLibrary, QualityGateBanner, BenchmarkingChart, TransferProtocol, MarkdownRenderer, NeuralLoadingGrid } from './components/DashboardComponents';
 import { ReportView } from './components/ReportView';
 import { LoginModal } from './components/LoginModal';
 import { checkSession, logout } from './services/authService';
@@ -475,23 +476,23 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                <SignalWarningBanner strength={result.phase_2_validation.metrics.signal_strength} />
+                <QualityGateBanner gate={result.quality_gate} />
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="md:col-span-2 md:row-span-2">
-                    <GaugeCard size="large" value={result.phase_2_validation.metrics.finops_readiness} label="FinOps Readiness" color="#10b981" trend="positive" subLabel="Composite Index" />
+                    <GaugeCard size="large" value={result.phase_2_validation.metrics.finops_readiness} label="FinOps Readiness" color="#10b981" trend="positive" subLabel="Composite Index" description={METRIC_DESCRIPTIONS.finops_readiness} />
                   </div>
                   <div className="md:col-span-1">
-                    <GaugeCard value={result.phase_2_validation.metrics.maturity_ratio} label="Maturity Level" color="#14b8a6" trend="positive" />
+                    <GaugeCard value={result.phase_2_validation.metrics.maturity_ratio} label="Maturity Level" color="#14b8a6" trend="positive" description={METRIC_DESCRIPTIONS.maturity_ratio} />
                   </div>
                   <div className="md:col-span-1">
-                    <GaugeCard value={result.phase_2_validation.metrics.maturity_depth} label="Maturity Depth" color="#06b6d4" trend="positive" />
+                    <GaugeCard value={result.phase_2_validation.metrics.maturity_depth} label="Maturity Depth" color="#06b6d4" trend="positive" description={METRIC_DESCRIPTIONS.maturity_depth} />
                   </div>
                   <div className="md:col-span-1">
-                    <GaugeCard value={result.phase_2_validation.metrics.antipattern_ratio} label="Anti-Pattern Level" color="#f43f5e" trend="negative" />
+                    <GaugeCard value={result.phase_2_validation.metrics.antipattern_ratio} label="Anti-Pattern Level" color="#f43f5e" trend="negative" description={METRIC_DESCRIPTIONS.antipattern_ratio} />
                   </div>
                   <div className="md:col-span-1">
-                    <GaugeCard value={result.phase_2_validation.metrics.antipattern_burden} label="Anti-Pattern Burden" color="#e11d48" trend="negative" />
+                    <GaugeCard value={result.phase_2_validation.metrics.antipattern_burden} label="Anti-Pattern Burden" color="#e11d48" trend="negative" description={METRIC_DESCRIPTIONS.antipattern_burden} />
                   </div>
                 </div>
 

@@ -1,7 +1,67 @@
 import React, { useState } from 'react';
-import { AuditItem, DiagnosticResult } from '../types';
+import { AuditItem, DiagnosticResult, QualityGateResult } from '../types';
 import { MarkdownRenderer } from './DashboardComponents';
 import { BATCH_TITLES, MASTER_BINGO_FINOPS } from '../knowledge_base';
+import { METRIC_DESCRIPTIONS } from '../constants';
+import { SVG_CSS, svgGaugeCard, svgRadar, svgScatter } from '../services/svgChartService';
+
+const InlineSvg: React.FC<{ html: string; className?: string }> = ({ html, className }) => (
+  <div className={className} dangerouslySetInnerHTML={{ __html: html }} />
+);
+
+const QualityGateBlock: React.FC<{ gate: QualityGateResult }> = ({ gate }) => {
+  if (gate.decision === 'GO') {
+    return (
+      <div className="mb-8 p-4 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 text-sm">
+        <span className="font-bold">Quality Gate: GO</span> — {gate.notes[0]}
+      </div>
+    );
+  }
+  const isBlock = gate.decision === 'BLOCK';
+  return (
+    <div className={`mb-8 p-6 rounded-xl border-l-4 ${isBlock ? 'border-l-rose-600 bg-rose-50' : 'border-l-amber-600 bg-amber-50'}`}>
+      <h2 className={`text-xl font-bold mb-2 ${isBlock ? 'text-rose-800' : 'text-amber-800'}`}>
+        Quality Gate: {gate.decision}
+      </h2>
+      <p className="text-sm text-slate-700 mb-4">{gate.notes[0]}</p>
+      {gate.blocking_reasons.length > 0 && (
+        <div className="mb-4">
+          <p className="text-xs font-bold uppercase tracking-wider text-rose-700 mb-2">Blocking</p>
+          <ul className="space-y-1.5 text-sm text-slate-700">
+            {gate.blocking_reasons.map((r, i) => (
+              <li key={i} className="pl-3 border-l-2 border-rose-400">{r}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {gate.warnings.length > 0 && (
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-amber-700 mb-2">Warnings</p>
+          <ul className="space-y-1.5 text-sm text-slate-700">
+            {gate.warnings.map((w, i) => (
+              <li key={i} className="pl-3 border-l-2 border-amber-400">{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {gate.fact_check && !gate.fact_check.failed && gate.fact_check.unsupported_claims.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-slate-300">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+            Unverified claims ({gate.fact_check.unsupported_claims.length} survived {gate.fact_check.attempts} pass{gate.fact_check.attempts === 1 ? '' : 'es'})
+          </p>
+          <ul className="space-y-2 text-sm text-slate-700">
+            {gate.fact_check.unsupported_claims.map((c, i) => (
+              <li key={i} className="pl-3 border-l-2 border-slate-400">
+                <span className="italic">&ldquo;{c.claim}&rdquo;</span>
+                {c.rationale && <span className="block text-xs text-slate-500 mt-0.5">{c.rationale}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const BATCHES: Array<'A' | 'B' | 'C' | 'D' | 'E'> = ['A', 'B', 'C', 'D', 'E'];
 
@@ -136,8 +196,19 @@ export const ReportView: React.FC<ReportViewProps> = ({ result, onBack, onDownlo
   const m = result.phase_2_validation.metrics;
   const cwrClass = result.phase_2_validation.crawl_walk_run;
 
+  const gauges = [
+    { value: m.finops_readiness, label: 'FinOps Readiness', color: '#10b981', description: METRIC_DESCRIPTIONS.finops_readiness, trend: 'positive' as const, size: 'large' as const },
+    { value: m.maturity_ratio, label: 'Maturity Level', color: '#14b8a6', description: METRIC_DESCRIPTIONS.maturity_ratio, trend: 'positive' as const },
+    { value: m.maturity_depth, label: 'Maturity Depth', color: '#06b6d4', description: METRIC_DESCRIPTIONS.maturity_depth, trend: 'positive' as const },
+    { value: m.antipattern_ratio, label: 'Anti-Pattern Level', color: '#f43f5e', description: METRIC_DESCRIPTIONS.antipattern_ratio, trend: 'negative' as const },
+    { value: m.antipattern_burden, label: 'Anti-Pattern Burden', color: '#e11d48', description: METRIC_DESCRIPTIONS.antipattern_burden, trend: 'negative' as const },
+    { value: m.delivery_integrity, label: 'Delivery Integrity', color: '#475569', description: METRIC_DESCRIPTIONS.delivery_integrity, trend: 'positive' as const },
+    { value: m.evidence_density, label: 'Evidence Density', color: '#475569', description: METRIC_DESCRIPTIONS.evidence_density, trend: 'positive' as const }
+  ];
+
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
+      <style>{SVG_CSS}</style>
       <div className="sticky top-0 z-50 bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-4xl mx-auto px-6 py-4 flex justify-between items-center">
           <button onClick={onBack} className="text-sm font-bold text-slate-500 hover:text-slate-900 flex items-center gap-2">
@@ -151,10 +222,12 @@ export const ReportView: React.FC<ReportViewProps> = ({ result, onBack, onDownlo
       </div>
 
       <div className="max-w-4xl mx-auto px-6 py-12">
-        <div className="mb-12">
+        <div className="mb-8">
           <h1 className="text-4xl font-display font-bold text-slate-900 mb-2">FinOps Maturity Assessment</h1>
           <p className="text-slate-500">Generated: {result.meta.timestamp} | Engine: {result.meta.engine_version}</p>
         </div>
+
+        <QualityGateBlock gate={result.quality_gate} />
 
         <div className="mb-12 p-8 bg-slate-50 rounded-2xl border border-slate-200">
           <div className="flex items-center gap-4 mb-6">
@@ -162,25 +235,60 @@ export const ReportView: React.FC<ReportViewProps> = ({ result, onBack, onDownlo
               {cwrClass}
             </span>
             <span className="text-slate-400">|</span>
-            <span className="text-sm font-mono text-slate-500">Signal Strength: {Math.round(m.signal_strength)}%</span>
+            <span className="text-sm font-mono text-slate-500">
+              Delivery {m.delivery_integrity}% · Evidence {m.evidence_density}%
+            </span>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">FinOps Readiness</p>
               <p className="text-3xl font-bold text-emerald-600">{Math.round(m.finops_readiness)}%</p>
+              <p className="text-xs text-slate-500 mt-1 leading-snug">{METRIC_DESCRIPTIONS.finops_readiness}</p>
             </div>
             <div>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Maturity Depth</p>
               <p className="text-3xl font-bold text-teal-600">{Math.round(m.maturity_depth)}%</p>
+              <p className="text-xs text-slate-500 mt-1 leading-snug">{METRIC_DESCRIPTIONS.maturity_depth}</p>
             </div>
             <div>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Anti-Pattern Burden</p>
               <p className="text-3xl font-bold text-rose-600">{Math.round(m.antipattern_burden)}%</p>
+              <p className="text-xs text-slate-500 mt-1 leading-snug">{METRIC_DESCRIPTIONS.antipattern_burden}</p>
             </div>
             <div>
               <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Maturity Ratio</p>
               <p className="text-3xl font-bold text-violet-600">{Math.round(m.maturity_ratio)}%</p>
+              <p className="text-xs text-slate-500 mt-1 leading-snug">{METRIC_DESCRIPTIONS.maturity_ratio}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-12">
+          <h2 className="text-2xl font-display font-bold text-slate-900 mb-6 pb-3 border-b border-slate-200">Maturity Gauges</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-stretch">
+            {gauges.map((g, i) => (
+              <InlineSvg
+                key={g.label}
+                html={svgGaugeCard(g)}
+                className={i === 0 ? 'col-span-2 md:col-span-3' : ''}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-12">
+          <h2 className="text-2xl font-display font-bold text-slate-900 mb-6 pb-3 border-b border-slate-200">Visual Diagnosis</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="chart-card">
+              <h3>Category Footprint</h3>
+              <p className="chart-desc">Per-domain maturity (emerald) vs anti-pattern burden (rose). Each axis is one of the five batches; values are the sum of sub-criterion counts (0–15) for that batch.</p>
+              <InlineSvg html={svgRadar(result.phase_1_audit_logs)} />
+            </div>
+            <div className="chart-card">
+              <h3>Position vs. Quadrants</h3>
+              <p className="chart-desc">FinOps Readiness (x-axis) plotted against Anti-Pattern Burden (y-axis). The bottom-right quadrant is the goal: high readiness, low burden.</p>
+              <InlineSvg html={svgScatter(m.finops_readiness, m.antipattern_burden)} />
             </div>
           </div>
         </div>

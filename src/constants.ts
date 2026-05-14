@@ -1,4 +1,21 @@
 
+export const METRIC_DESCRIPTIONS: Record<string, string> = {
+  finops_readiness:
+    'Composite score combining maturity points earned and anti-pattern burden, normalized to 0–100. Higher = closer to embedded FinOps practice.',
+  maturity_ratio:
+    'Share of the 25 maturity criteria that scored as fully embedded (3 of 3 sub-criteria met).',
+  maturity_depth:
+    'Average maturity score across all 25 criteria on a 0–3 scale, normalized to 0–100%. Captures partial progress that maturity_ratio misses.',
+  antipattern_ratio:
+    'Share of the 25 anti-patterns scored as deeply entrenched (3 of 3 sub-criteria met). Higher = worse.',
+  antipattern_burden:
+    'Average severity across all 25 anti-patterns. Higher = more friction blocking current FinOps practice.',
+  delivery_integrity:
+    'Did the audit pipeline complete? Share of 50 criteria the LLM returned valid data for. Below 100% means batches failed.',
+  evidence_density:
+    'Did the source actually say anything? Share of 50 criteria where the audit captured at least one quotable evidence excerpt from the source document.'
+};
+
 export const FINOPS_METHODOLOGY_CONTEXT = `
 <methodology_phases>
 The FinOps maturity journey is guided by the "Crawl-Walk-Run" framework:
@@ -53,7 +70,10 @@ ${FINOPS_METHODOLOGY_CONTEXT}
 <strict_constraints>
 1. **SOURCE OF TRUTH:** When diagnosing the current state, you must ONLY use facts found in <SOURCE_DOCUMENT_TO_AUDIT> or the VALIDATED SYSTEM REPORT.
 2. **KNOWLEDGE INJECTION:** You must use the **VERIFIED TACTICS DATABASE** to prescribe specific fixes. If you see "Missing cost tagging", you MUST prescribe the Tag Governance Framework and cite the relevant case study from the database.
-3. **FLUENT REFERENCE (CRITICAL):** If a tactic in the database contains a tool or methodology, **mention it by name** as a natural part of the sentence.
+3. **FLUENT REFERENCE (CRITICAL):** If a tactic in the database contains a tool or methodology, **mention it by name** as a natural part of the sentence AND immediately follow the mention with the tactic's ID in square brackets.
+   - **REQUIRED FORMAT:** "Implement the Tag Governance Framework [TAC-VIS-002] modeled on Spotify's success."
+   - **The bracketed ID must be EXACTLY one of the IDs from the VERIFIED TACTICS DATABASE.** Do not invent IDs.
+   - **EVERY ACTION** in the remediation_roadmap that prescribes a tactic must include exactly one bracketed tactic ID. If an action is generic guidance not tied to a specific tactic, omit the bracket.
    - **DO NOT** use Markdown links (e.g., [Title](URL)).
    - **DO NOT** use command phrases like "Download", "Read", or "Click here".
    - **DO NOT** output URLs in the narrative.
@@ -108,7 +128,7 @@ STRICTLY return a JSON object.
       "burden_score": "String (e.g. 'Critical')"
     },
     "remediation_roadmap": [
-      { "phase": "1. Crawl — Foundation (0-3 Months)", "actions": ["Action 1", "Action 2 (referencing *Tool Name*)"] },
+      { "phase": "1. Crawl — Foundation (0-3 Months)", "actions": ["Implement the Tag Governance Framework [TAC-VIS-002] across all production accounts.", "Deploy automated rightsizing [TAC-OPT-001] for non-prod workloads."] },
       { "phase": "2. Walk — Optimization (3-6 Months)", "actions": ["..."] },
       { "phase": "3. Walk — Embedding (6-12 Months)", "actions": ["..."] },
       { "phase": "4. Run — Continuous (12+ Months)", "actions": ["..."] }

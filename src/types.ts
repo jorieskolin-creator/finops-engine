@@ -29,7 +29,8 @@ export interface Metrics {
   maturity_depth: number;
   antipattern_burden: number;
   finops_readiness: number;
-  signal_strength: number;
+  delivery_integrity: number;
+  evidence_density: number;
 }
 
 export interface RawCounts {
@@ -76,11 +77,45 @@ export interface AnalysisMeta {
   };
 }
 
+export type QualityGateDecision = 'GO' | 'WARN' | 'BLOCK';
+
+export type ClaimClassification = 'supported_by_source' | 'supported_by_audit' | 'unsupported';
+
+export interface FactCheckClaim {
+  claim: string;
+  classification: ClaimClassification;
+  rationale: string;
+}
+
+export interface FactCheckResult {
+  attempts: number;
+  total_claims: number;
+  supported_count: number;
+  unsupported_claims: FactCheckClaim[];
+  failed: boolean;
+  failure_reason?: string;
+}
+
+export interface QualityGateResult {
+  decision: QualityGateDecision;
+  blocking_reasons: string[];
+  warnings: string[];
+  notes: string[];
+  thresholds: {
+    evidence_density_block: number;
+    evidence_density_warn: number;
+    silent_areas_warn: number;
+    unsupported_claims_block: number;
+  };
+  fact_check?: FactCheckResult;
+}
+
 export interface DiagnosticResult {
   meta: AnalysisMeta;
   phase_1_audit_logs: Phase1AuditLogs;
   phase_2_validation: Phase2Validation;
   phase_3_strategy: Phase3Strategy;
+  quality_gate: QualityGateResult;
 }
 
 export interface ScanResult {
