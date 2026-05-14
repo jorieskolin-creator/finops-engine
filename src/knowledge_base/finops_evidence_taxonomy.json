@@ -56,6 +56,24 @@
     "Specific numbers, percentages, or metrics strengthen evidence quality",
     "Generic industry jargon without context is weak evidence (Score 1)"
   ],
+  "evidence_categories": {
+    "description": "Orthogonal to score. Every evidence_quote captured in Phase 1 must be tagged with exactly one of these seven categories.",
+    "categories": {
+      "Policy": "Written rules, standards, or formal documents that DECLARE intent. Examples: tagging policy, budget approval policy, cost governance charter.",
+      "Process": "Recurring human practices or workflows that are described as actually happening. Examples: monthly cost review meetings, quarterly architecture reviews, weekly tag audits.",
+      "Operational": "Day-to-day tactical activities and roles. Examples: a FinOps analyst rightsizes EC2 weekly, a team triages anomaly alerts daily.",
+      "Automation": "Code, scripts, or platform features that ENFORCE without human intervention. Examples: CI/CD blocks untagged resources, Lambda kills idle instances, IaC policy-as-code.",
+      "Accountability": "Mechanisms that assign ownership and consequences. Examples: cost-center showback, team-level chargeback, cost is a KPI on engineering scorecards.",
+      "Financial-Integration": "Cost data is wired into financial systems or business decisions. Examples: cloud spend reconciled with GL, unit-cost-per-transaction reported to product, ROI gates investment.",
+      "Cultural": "Beliefs, norms, and incentives that shape behavior. Examples: engineers cite cost in design docs, cost is mentioned in standups, savings are celebrated."
+    },
+    "tagging_rules": [
+      "Every evidence_quote MUST carry exactly one category from the seven above.",
+      "If a quote could plausibly fit multiple categories, pick the dominant one (the one the quote most directly evidences).",
+      "Automation supersedes Policy when the quote describes enforcement, not just declaration.",
+      "Cultural supersedes Process when the quote describes a norm or belief, not a scheduled activity."
+    ]
+  },
   "false_positive_guards": [
     "Mentioning a tool name does not mean the tool is actively used",
     "Having a dashboard does not mean anyone looks at it",

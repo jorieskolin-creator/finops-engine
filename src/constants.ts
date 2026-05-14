@@ -1,4 +1,6 @@
 
+import { STRATEGY_GUARDRAILS, FINOPS_PERSONAS } from './knowledge_base';
+
 export const METRIC_DESCRIPTIONS: Record<string, string> = {
   finops_readiness:
     'Composite score combining maturity points earned and anti-pattern burden, normalized to 0–100. Higher = closer to embedded FinOps practice.',
@@ -44,6 +46,8 @@ The FinOps maturity journey is guided by the "Crawl-Walk-Run" framework:
 `;
 
 export const STRATEGY_SYSTEM_INSTRUCTION = `
+${STRATEGY_GUARDRAILS}
+
 You are the "FinOps Strategic Architect" for the Crawl-Walk-Run maturity framework.
 You are NOT a consultant offering suggestions; you are a turnaround CFO/CTO giving directives.
 Your job is to synthesize forensic FinOps findings into a ruthless, evidence-based optimization roadmap.
@@ -51,6 +55,22 @@ Your job is to synthesize forensic FinOps findings into a ruthless, evidence-bas
 You scan the provided findings against Phase 2 output. You are looking for specific maturity gaps and anti-pattern evidence.
 You do not use "weasel words" like "consider", "suggest", or "might". You use active verbs: "Implement", "Eliminate", "Enforce", "Automate".
 `;
+
+const buildPersonaBlock = (): string => {
+  const p = (FINOPS_PERSONAS as any).personas || {};
+  const ids = ['finops_lead', 'cfo', 'engineering_lead'];
+  return ids.map(id => {
+    const persona = p[id] || {};
+    return `
+**Persona: ${id}** (${persona.title || id})
+- Focus areas: ${(persona.focus_areas || []).join(', ')}
+- Language style: ${persona.language_style || ''}
+- Key questions this persona is asking:
+  ${(persona.key_questions || []).map((q: string) => `- ${q}`).join('\n  ')}`;
+  }).join('\n');
+};
+
+export const STRATEGY_PERSONAS_BLOCK = buildPersonaBlock();
 
 export const STRATEGY_USER_PROMPT = `
 <input_data>
@@ -67,6 +87,17 @@ You will be provided with:
 ${FINOPS_METHODOLOGY_CONTEXT}
 </reference_material>
 
+<personas>
+You will produce THREE persona-tailored executive summaries from the same diagnostic data. The three personas:
+${STRATEGY_PERSONAS_BLOCK}
+
+**PERSONA CONSISTENCY RULES (NON-NEGOTIABLE):**
+- All three summaries must AGREE on facts: scores, classification (Crawl/Walk/Run), top blockers, top tactics.
+- They differ only in lens, vocabulary, and emphasis — driven by each persona's focus_areas and language_style.
+- The CFO summary must NOT invent dollar amounts. Reference impact in business terms (e.g., "material risk exposure", "investment justification") but never fabricate numbers not present in Phase 2.
+- The Engineering Lead summary uses technical/architectural vocabulary; the FinOps Lead summary uses FinOps Foundation terminology; the CFO summary uses financial-decision-maker vocabulary.
+</personas>
+
 <strict_constraints>
 1. **SOURCE OF TRUTH:** When diagnosing the current state, you must ONLY use facts found in <SOURCE_DOCUMENT_TO_AUDIT> or the VALIDATED SYSTEM REPORT.
 2. **KNOWLEDGE INJECTION:** You must use the **VERIFIED TACTICS DATABASE** to prescribe specific fixes. If you see "Missing cost tagging", you MUST prescribe the Tag Governance Framework and cite the relevant case study from the database.
@@ -78,7 +109,7 @@ ${FINOPS_METHODOLOGY_CONTEXT}
    - **DO NOT** use command phrases like "Download", "Read", or "Click here".
    - **DO NOT** output URLs in the narrative.
 4. **METHODOLOGY:** You MUST structure the "Remediation Roadmap" according to the Crawl-Walk-Run methodology.
-5. **BREVITY:** The Executive Summary must be > 300 words, but < 500 words.
+5. **BREVITY:** Each persona-tailored Executive Summary must be > 300 words but < 500 words.
 6. **JSON STRING SAFETY (CRITICAL):**
    - **ABSOLUTELY NO DOUBLE QUOTES** inside JSON values. Use single quotes or asterisks.
    - **USE ASTERISKS:** Use asterisks (*) for emphasis.
@@ -96,8 +127,8 @@ ${FINOPS_METHODOLOGY_CONTEXT}
      - Use the Crawl-Walk-Run framework to structure the roadmap.
      - Use case studies from the DATABASE to prescribe specific mechanisms.
 
-2. **Draft Executive Summary (The Verdict):**
-   Write a high-impact narrative using exactly these three paragraphs:
+2. **Draft Executive Summaries (One per Persona — Three Total):**
+   For EACH of the three personas (finops_lead, cfo, engineering_lead), write a high-impact narrative using exactly this 3-paragraph structure, with the vocabulary and emphasis adapted to that persona's focus_areas and language_style:
 
    **1. FinOps Maturity Verdict:** (A concise verdict of the organization*s current FinOps maturity. Reference the Crawl/Walk/Run classification. State the anti-pattern burden.)
 
@@ -106,6 +137,8 @@ ${FINOPS_METHODOLOGY_CONTEXT}
 
    **3. Strategic Directives:**
    (Concrete directives for the optimization roadmap. Reference tactics by name from the database.)
+
+   All three summaries must agree on facts; they differ only in lens. Each summary must be > 300 words and < 500 words.
 
 3. **Visual Scorecard:** Create short, punchy headlines for the scorecard.
 4. **Remediation Roadmap:** Create a 4-phase roadmap:
@@ -121,7 +154,11 @@ ${FINOPS_METHODOLOGY_CONTEXT}
 STRICTLY return a JSON object.
 {
   "phase_3_strategy": {
-    "executive_summary": "String (Markdown. Use the 3-paragraph structure with bold labels. USE ASTERISKS (*) for emphasis; NO double quotes.)",
+    "executive_summaries": {
+      "finops_lead": "String (Markdown. 3-paragraph structure with bold labels. Operational FinOps vocabulary. USE ASTERISKS (*) for emphasis; NO double quotes.)",
+      "cfo": "String (Markdown. 3-paragraph structure. Financial/strategic vocabulary; ROI/risk/investment framing. No fabricated dollar amounts. USE ASTERISKS (*) for emphasis; NO double quotes.)",
+      "engineering_lead": "String (Markdown. 3-paragraph structure. Technical/architectural vocabulary; performance-cost tradeoffs. USE ASTERISKS (*) for emphasis; NO double quotes.)"
+    },
     "visual_scorecard": {
       "headline": "String (e.g. 'Crawl-Stage FinOps Detected')",
       "maturity_score": "String (e.g. 'Low')",

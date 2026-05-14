@@ -2,7 +2,7 @@
 import { STRATEGY_SYSTEM_INSTRUCTION, STRATEGY_USER_PROMPT } from "../constants";
 import { runPhase1Audit } from "../orchestrator";
 import { knowledgeBaseService, BATCH_DEFINITIONS } from "../knowledge_base";
-import { DiagnosticResult, Phase1AuditLogs, Phase2Validation, AuditItem, EvidenceQuote } from "../types";
+import { DiagnosticResult, Phase1AuditLogs, Phase2Validation, AuditItem, EvidenceQuote, EvidenceCategory, EVIDENCE_CATEGORIES, PersonaId, PERSONA_IDS } from "../types";
 import { generateSafetyAuditPrompt } from "./securityService";
 import { validatePhase1Output, validatePhase3Grounding } from "./validatorService";
 import { buildEvidenceDensityBlock, runQualityGate, EVIDENCE_DENSITY_BLOCK } from "./qualityGateService";
@@ -19,6 +19,35 @@ const ALL_CRITERIA_IDS = [
   'D1', 'D2', 'D3', 'D4', 'D5',
   'E1', 'E2', 'E3', 'E4', 'E5'
 ];
+
+const DEFAULT_PERSONA: PersonaId = 'finops_lead';
+
+const normalizePersonaSummaries = (rawStrategy: any): {
+  executive_summaries: Record<PersonaId, string>;
+  executive_summary: string;
+  active_persona: PersonaId;
+} => {
+  const incoming = rawStrategy?.executive_summaries;
+  const legacy = typeof rawStrategy?.executive_summary === 'string' ? rawStrategy.executive_summary : '';
+  const result: Record<PersonaId, string> = { finops_lead: '', cfo: '', engineering_lead: '' };
+  if (incoming && typeof incoming === 'object') {
+    for (const p of PERSONA_IDS) {
+      if (typeof incoming[p] === 'string' && incoming[p].length > 0) {
+        result[p] = incoming[p];
+      }
+    }
+  }
+  const firstAvailable = PERSONA_IDS.find(p => result[p].length > 0);
+  const fallback = firstAvailable ? result[firstAvailable] : legacy;
+  for (const p of PERSONA_IDS) {
+    if (!result[p]) result[p] = fallback;
+  }
+  return {
+    executive_summaries: result,
+    executive_summary: result[DEFAULT_PERSONA] || fallback,
+    active_persona: DEFAULT_PERSONA
+  };
+};
 
 const parseAiResponse = (text: string): any => {
   if (!text) return {};
@@ -96,8 +125,17 @@ const validateAndSanitizeLogs = (rawData: any): Phase1AuditLogs => {
         .map((q: any): EvidenceQuote => ({
           quote: q.quote,
           source_document: typeof q.source_document === 'string' ? q.source_document : undefined,
-          section: typeof q.section === 'string' ? q.section : undefined
+          section: typeof q.section === 'string' ? q.section : undefined,
+          category: EVIDENCE_CATEGORIES.includes(q.category) ? q.category as EvidenceCategory : undefined
         }));
+    }
+
+    if (safeItem.evidence_quotes.length > 0) {
+      const footprint: Partial<Record<EvidenceCategory, number>> = {};
+      for (const q of safeItem.evidence_quotes) {
+        if (q.category) footprint[q.category] = (footprint[q.category] || 0) + 1;
+      }
+      if (Object.keys(footprint).length > 0) safeItem.category_footprint = footprint;
     }
 
     return safeItem;
@@ -119,10 +157,17 @@ const calculateMetrics = (logs: Phase1AuditLogs): Phase2Validation => {
   let itemsWithEvidence = 0;
   const silentAreas: string[] = [];
   const categoryScores: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, E: 0 };
+  const evidenceCategoryTotals: Partial<Record<EvidenceCategory, number>> = {};
 
   const tally = (item: AuditItem) => {
     if (item.count !== -1) deliveredItems++;
     if (item.evidence_quotes && item.evidence_quotes.length > 0) itemsWithEvidence++;
+    if (item.category_footprint) {
+      for (const [cat, n] of Object.entries(item.category_footprint)) {
+        const c = cat as EvidenceCategory;
+        evidenceCategoryTotals[c] = (evidenceCategoryTotals[c] || 0) + (n as number);
+      }
+    }
   };
 
   Object.entries(logs.maturity).forEach(([key, rawItem]) => {
@@ -184,6 +229,7 @@ const calculateMetrics = (logs: Phase1AuditLogs): Phase2Validation => {
     antipattern_findings: antipatternFindings,
     silent_areas: silentAreas,
     category_scores: categoryScores,
+    evidence_category_totals: evidenceCategoryTotals,
     crawl_walk_run
   };
 };
@@ -264,6 +310,12 @@ export const analyzeDocument = async (
         phase_2_validation: validationData,
         phase_3_strategy: {
           executive_summary: `_Strategy generation skipped — see Quality Gate above._`,
+          executive_summaries: {
+            finops_lead: `_Strategy generation skipped — see Quality Gate above._`,
+            cfo: `_Strategy generation skipped — see Quality Gate above._`,
+            engineering_lead: `_Strategy generation skipped — see Quality Gate above._`
+          },
+          active_persona: DEFAULT_PERSONA,
           visual_scorecard: { headline: "Audit Inconclusive", maturity_score: "N/A", burden_score: "N/A" },
           remediation_roadmap: []
         },
@@ -314,8 +366,18 @@ ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}
     };
 
     const runFactCheck = async (data: any, attemptNumber: number): Promise<FactCheckResult> => {
-      const summary = data?.phase_3_strategy?.executive_summary || '';
-      const roadmap = data?.phase_3_strategy?.remediation_roadmap || [];
+      const strategy = data?.phase_3_strategy || {};
+      const summaries = strategy.executive_summaries && typeof strategy.executive_summaries === 'object'
+        ? strategy.executive_summaries
+        : { [DEFAULT_PERSONA]: strategy.executive_summary || '' };
+      const summary = PERSONA_IDS
+        .map(p => {
+          const text = typeof summaries[p] === 'string' ? summaries[p] : '';
+          return text ? `[Persona: ${p}]\n${text}` : '';
+        })
+        .filter(Boolean)
+        .join('\n\n---\n\n');
+      const roadmap = strategy.remediation_roadmap || [];
       const roadmapText = roadmap.flatMap((p: any) => Array.isArray(p.actions) ? p.actions : []).join('\n');
       try {
         const fcPrompt = buildFactCheckPrompt({
@@ -344,7 +406,19 @@ ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}
       }
     };
 
-    let strategyData: any = await callPhase3();
+    const normalizeStrategy = (raw: any): any => {
+      if (!raw?.phase_3_strategy) return raw;
+      const normalized = normalizePersonaSummaries(raw.phase_3_strategy);
+      raw.phase_3_strategy = {
+        ...raw.phase_3_strategy,
+        executive_summaries: normalized.executive_summaries,
+        executive_summary: normalized.executive_summary,
+        active_persona: normalized.active_persona
+      };
+      return raw;
+    };
+
+    let strategyData: any = normalizeStrategy(await callPhase3());
     onProgress('strategy', 70);
     let factCheck = await runFactCheck(strategyData, 1);
     let lastUnsupported: FactCheckClaim[] = factCheck.unsupported_claims;
@@ -356,7 +430,7 @@ ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}
       attempt <= FACT_CHECK_MAX_RETRIES
     ) {
       console.log(`[FinOps] Fact-check pass ${attempt}: ${lastUnsupported.length} unsupported claims, regenerating...`);
-      strategyData = await callPhase3(buildRegenerateAppendix(lastUnsupported));
+      strategyData = normalizeStrategy(await callPhase3(buildRegenerateAppendix(lastUnsupported)));
       attempt++;
       factCheck = await runFactCheck(strategyData, attempt);
       lastUnsupported = factCheck.unsupported_claims;
@@ -398,6 +472,12 @@ ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}
       phase_2_validation: validationData,
       phase_3_strategy: strategyData.phase_3_strategy || {
         executive_summary: "Strategy incomplete.",
+        executive_summaries: {
+          finops_lead: "Strategy incomplete.",
+          cfo: "Strategy incomplete.",
+          engineering_lead: "Strategy incomplete."
+        },
+        active_persona: DEFAULT_PERSONA,
         visual_scorecard: { headline: "Error", maturity_score: "N/A", burden_score: "N/A" },
         remediation_roadmap: []
       },

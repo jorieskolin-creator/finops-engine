@@ -1,102 +1,26 @@
 {
-  "version": "1.0.0",
-  "description": "Deterministic validation rules for Phase 1 output validation and Phase 3 grounding verification.",
-  "phase1_validation": {
-    "schema_rules": {
-      "required_streams": ["maturity", "antipattern"],
-      "criteria_ids_per_batch": {
-        "A": ["A1", "A2", "A3", "A4", "A5"],
-        "B": ["B1", "B2", "B3", "B4", "B5"],
-        "C": ["C1", "C2", "C3", "C4", "C5"],
-        "D": ["D1", "D2", "D3", "D4", "D5"],
-        "E": ["E1", "E2", "E3", "E4", "E5"]
-      },
-      "total_criteria_per_stream": 25,
-      "score_range": { "min": 0, "max": 3 },
-      "required_fields_per_item": ["count", "evidence", "reasoning"]
+  "version": "2.0.0",
+  "description": "Machine-readable validation rules consumed by src/services/validatorService.ts. This file is the source of truth: changing values here changes engine behavior.",
+  "phase1": {
+    "required_streams": ["maturity", "antipattern"],
+    "criteria_ids_per_batch": {
+      "A": ["A1", "A2", "A3", "A4", "A5"],
+      "B": ["B1", "B2", "B3", "B4", "B5"],
+      "C": ["C1", "C2", "C3", "C4", "C5"],
+      "D": ["D1", "D2", "D3", "D4", "D5"],
+      "E": ["E1", "E2", "E3", "E4", "E5"]
     },
-    "evidence_consistency_rules": [
-      {
-        "rule_id": "EV-001",
-        "description": "Score > 0 must have evidence beyond default string",
-        "check": "if count > 0 then evidence.length > 20 AND evidence !== 'Document silent on this topic.'"
-      },
-      {
-        "rule_id": "EV-002",
-        "description": "Score 0 must have silence-indicating evidence",
-        "check": "if count === 0 then evidence contains 'silent' OR 'absent' OR 'not found' OR 'no evidence' OR 'missing'"
-      },
-      {
-        "rule_id": "EV-003",
-        "description": "Reasoning must reference sub-criteria evaluation",
-        "check": "reasoning contains 'Crit 1' OR 'Sub-criteria' OR numbered evaluation pattern"
-      },
-      {
-        "rule_id": "EV-004",
-        "description": "Score must be mathematically consistent with sub-criteria count in reasoning",
-        "check": "count of 'Found' or 'Met' in reasoning should approximate score value"
-      }
-    ],
-    "completeness_rules": [
-      {
-        "rule_id": "COMP-001",
-        "description": "All 25 criteria per stream must be present",
-        "severity": "error"
-      },
-      {
-        "rule_id": "COMP-002",
-        "description": "No duplicate criteria IDs within a stream",
-        "severity": "error"
-      },
-      {
-        "rule_id": "COMP-003",
-        "description": "All scores must be integers in [0,3]",
-        "severity": "error"
-      }
-    ]
+    "total_criteria_per_stream": 25,
+    "score_range": { "min": 0, "max": 3 },
+    "required_fields_per_item": ["count", "evidence", "reasoning"],
+    "evidence_min_length_when_scored": 20,
+    "silence_keywords": ["silent", "absent", "not found", "no evidence", "missing", "not mentioned"],
+    "silence_evidence_max_length_before_warning": 5
   },
-  "phase3_grounding": {
-    "claim_verification_rules": [
-      {
-        "rule_id": "GND-001",
-        "description": "Every tactic_id referenced must exist in the tactics database",
-        "check": "extract all TAC-XXX-NNN patterns, verify each exists in tactics DB"
-      },
-      {
-        "rule_id": "GND-002",
-        "description": "No weasel words in strategic recommendations",
-        "weasel_words": ["consider", "might", "could potentially", "perhaps", "it may be worth", "you could try", "we suggest exploring"],
-        "check": "scan remediation actions for weasel word patterns"
-      },
-      {
-        "rule_id": "GND-003",
-        "description": "Executive summary scores must match Phase 2 metrics",
-        "check": "extract any percentage or score claims from summary, verify against Phase 2 validation data"
-      },
-      {
-        "rule_id": "GND-004",
-        "description": "Remediation roadmap must address top blockers from Phase 2",
-        "check": "Phase 2 key_blockers should have corresponding remediation actions"
-      }
-    ],
-    "tactic_mapping_rules": [
-      {
-        "rule_id": "MAP-001",
-        "description": "Each maturity gap should map to at least one tactic",
-        "severity": "warning"
-      },
-      {
-        "rule_id": "MAP-002",
-        "description": "Tactics must come from the verified database, not invented",
-        "severity": "error"
-      }
-    ]
-  },
-  "termination_policy": {
-    "max_retries": 2,
-    "on_final_failure": "graceful_degradation",
-    "graceful_degradation_behavior": "Emit partial report with confidence warning. Phase 3 marked as incomplete with explanation. Phase 1 and Phase 2 results still delivered.",
-    "user_visible_signal": true,
-    "repair_transparency": "If repair was needed, include a 'validation_notes' field in the output explaining what was repaired."
+  "phase3": {
+    "executive_summary_min_length": 100,
+    "weasel_words": ["consider", "might", "could potentially", "perhaps", "it may be worth", "you could try", "we suggest exploring"],
+    "tactic_id_pattern": "TAC-[A-Z]+-\\d{3}",
+    "require_tactic_citations_when_actions_exist": true
   }
 }
