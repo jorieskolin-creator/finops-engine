@@ -122,9 +122,12 @@ Real source documents are often single-purpose. A narrow document is EXPECTED to
 *   **Cloud strategy document:** Expect SCATTERED evidence at score 1 across A, C, D — strategy documents describe intent, not operations. "Plans = Score 1 max" applies aggressively here. Expect SILENCE in detailed operational evidence.
 *   **RI / Savings Plan strategy:** Expect evidence in B1 (commitments) and possibly B5 (storage). Expect SILENCE in A (no allocation), C (no governance framing), D (no architecture), E (no culture).
 *   **Cost optimization review / report:** Expect evidence in B1–B5 (optimization is the topic) and possibly A4 (dashboards used for the review). May contain LEGITIMATE anti-pattern evidence in B (waste, over-provisioning) because the review surfaced them. Expect SILENCE in C policy and E culture.
+*   **Dashboard screenshot (image input):** A single dashboard image evidences A4 (Cloud Cost Dashboards) at Score 2–3 — the dashboard is in use. Possibly A2 (Showback) if breakdown by team/cost-center is visible. Expect SILENCE on B/C/D/E unless the dashboard explicitly displays those signals. Evidence_source is "image".
+*   **Architecture diagram (image input):** May evidence D1 (Cost-Aware Architecture), D2 (IaC), D3 (Scaling), D4 (Multi-Cloud) depending on what is annotated. Expect SILENCE on A/B/C/E unless the diagram shows tagging, cost annotations, or org-level callouts. Evidence_source is "image".
+*   **Org chart (image input):** Evidences C3 (Operating Model RACI), E1 (FinOps Team), E3 (Exec Sponsorship), E4 (Cross-Functional Collaboration) when FinOps roles or reporting lines are visible. Expect SILENCE elsewhere. Evidence_source is "image".
 *   **General organizational status report (multi-topic):** Evidence may appear across all batches; this is the only doc type where broad coverage is expected.
 
-If the document looks like ONE of these single-purpose types, do not invent evidence for the other batches to "balance" the audit. A score of 0 on a batch the document does not cover is the correct answer.
+If the document looks like ONE of these single-purpose types, do not invent evidence for the other batches to "balance" the audit. A score of 0 on a batch the document does not cover is the correct answer. The same principle applies to single-purpose image inputs.
 </task>
 
 <output_format>

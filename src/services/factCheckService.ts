@@ -10,6 +10,7 @@ export interface FactCheckInputs {
   sourceDocument: string;
   phase1: Phase1AuditLogs;
   phase2: Phase2Validation;
+  imageCount?: number;
 }
 
 const MAX_SOURCE_CHARS = 40000;
@@ -51,10 +52,16 @@ Your job: extract every distinct factual claim from the STRATEGY OUTPUT below, t
 </role>
 
 <classifications>
-- "supported_by_source": the claim is directly stated or clearly implied in the SOURCE_DOCUMENT.
+- "supported_by_source": the claim is directly stated or clearly implied in the SOURCE_DOCUMENT, OR is clearly visible in one of the attached SOURCE_IMAGES (dashboard screenshot, architecture diagram, org chart, PDF page rendered as image).
 - "supported_by_audit": the claim is derived from PHASE_1_EVIDENCE or PHASE_2_METRICS (both produced by this engine from the source).
 - "unsupported": the claim cannot be traced to either above. This includes invented numbers, named entities not in the source, organizational claims with no evidence, and confident assertions about facts not present in the inputs.
 </classifications>
+
+<image_verification_rule>
+${(inputs.imageCount ?? 0) > 0
+  ? `This submission includes ${inputs.imageCount} source image(s) attached as additional content parts after this prompt. When verifying claims, inspect those images for visible evidence — a claim asserting "the dashboard breaks down cost per team" is supported_by_source if a screenshot visibly shows that breakdown. A claim asserting facts about a diagram or screenshot that are NOT actually visible in the attached image must be classified as unsupported.`
+  : `No source images are attached for this submission. Verify against text only.`}
+</image_verification_rule>
 
 <rules>
 - ONLY flag CONCRETE FACTUAL CLAIMS. Skip stylistic adjectives ("dangerously misleading"), generic FinOps principles ("FinOps requires culture change"), and uncontroversial truths.

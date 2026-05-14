@@ -2,7 +2,7 @@
 import { STRATEGY_SYSTEM_INSTRUCTION, STRATEGY_USER_PROMPT } from "../constants";
 import { runPhase1Audit } from "../orchestrator";
 import { knowledgeBaseService, BATCH_DEFINITIONS } from "../knowledge_base";
-import { DiagnosticResult, Phase1AuditLogs, Phase2Validation, AuditItem, EvidenceQuote, EvidenceCategory, EVIDENCE_CATEGORIES, PersonaId, PERSONA_IDS } from "../types";
+import { DiagnosticResult, Phase1AuditLogs, Phase2Validation, AuditItem, EvidenceQuote, EvidenceCategory, EVIDENCE_CATEGORIES, PersonaId, PERSONA_IDS, ImageInput } from "../types";
 import { generateSafetyAuditPrompt } from "./securityService";
 import { validatePhase1Output, validatePhase3Grounding } from "./validatorService";
 import { buildEvidenceDensityBlock, runQualityGate, EVIDENCE_DENSITY_BLOCK } from "./qualityGateService";
@@ -126,7 +126,9 @@ const validateAndSanitizeLogs = (rawData: any): Phase1AuditLogs => {
           quote: q.quote,
           source_document: typeof q.source_document === 'string' ? q.source_document : undefined,
           section: typeof q.section === 'string' ? q.section : undefined,
-          category: EVIDENCE_CATEGORIES.includes(q.category) ? q.category as EvidenceCategory : undefined
+          category: EVIDENCE_CATEGORIES.includes(q.category) ? q.category as EvidenceCategory : undefined,
+          evidence_source: q.evidence_source === 'image' ? 'image' : 'text',
+          page_number: typeof q.page_number === 'number' && q.page_number > 0 ? q.page_number : undefined
         }));
     }
 
@@ -236,16 +238,31 @@ const calculateMetrics = (logs: Phase1AuditLogs): Phase2Validation => {
 
 export const analyzeDocument = async (
   text: string,
+  images: ImageInput[],
   onProgress: (stage: 'audit' | 'calc' | 'strategy', progress?: number) => void
 ): Promise<DiagnosticResult> => {
   try {
+    const imagePayloadBytes = images.reduce((sum, img) => sum + img.data.length, 0);
+    if (images.length > 0) {
+      console.log(`[FinOps] Multimodal: ${images.length} image(s), ~${Math.round(imagePayloadBytes / 1024)} KB base64 payload.`);
+    }
+
     console.log("[FinOps] Running Security Pre-Flight (DLP)...");
     onProgress('audit', 1);
-    const dlpPrompt = generateSafetyAuditPrompt(text);
+    const dlpPrompt = generateSafetyAuditPrompt(text, images);
+
+    const dlpParts: any[] = [{ text: dlpPrompt }];
+    for (const img of images) {
+      const label = img.page_number !== undefined
+        ? `[Image: ${img.source_name} — page ${img.page_number}]`
+        : `[Image: ${img.source_name}]`;
+      dlpParts.push({ text: `\n${label}\n` });
+      dlpParts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
+    }
 
     const dlpResponse = await callGeminiGenerate(
       MODEL_PHASE1.id,
-      [{ role: 'user', parts: [{ text: dlpPrompt }] }],
+      [{ role: 'user', parts: dlpParts }],
       undefined,
       MODEL_PHASE1.thinkingConfig
     );
@@ -261,7 +278,7 @@ export const analyzeDocument = async (
 
     onProgress('audit', 5);
     console.log("[FinOps] Running Phase 1 Parallel Audit (5 batches)...");
-    const aggregatedRawData = await runPhase1Audit(text, (completed, total) => {
+    const aggregatedRawData = await runPhase1Audit(text, images, (completed, total) => {
       onProgress('audit', Math.round((completed / total) * 100));
     });
 
@@ -385,11 +402,20 @@ ${Object.entries(validationData.category_scores).map(([cat, score]) => `  ${cat}
           remediationRoadmapText: roadmapText,
           sourceDocument: text,
           phase1: auditLogs,
-          phase2: validationData
+          phase2: validationData,
+          imageCount: images.length
         });
+        const fcParts: any[] = [{ text: fcPrompt }];
+        for (const img of images) {
+          const label = img.page_number !== undefined
+            ? `[Image: ${img.source_name} — page ${img.page_number}]`
+            : `[Image: ${img.source_name}]`;
+          fcParts.push({ text: `\n${label}\n` });
+          fcParts.push({ inlineData: { mimeType: img.mimeType, data: img.data } });
+        }
         const fcResp = await callGeminiGenerate(
           MODEL_PHASE1.id,
-          [{ role: 'user', parts: [{ text: fcPrompt }] }],
+          [{ role: 'user', parts: fcParts }],
           undefined,
           MODEL_PHASE1.thinkingConfig
         );

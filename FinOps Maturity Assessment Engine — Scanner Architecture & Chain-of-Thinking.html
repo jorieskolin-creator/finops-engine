@@ -967,7 +967,7 @@
           <div class="stage-meta">DLP Officer · Gemini Flash · deterministic redaction layer</div>
         </div>
         <div class="stage-body">
-          DLP Officer LLM pass scans for PII, secrets, and irrelevant input. A deterministic regex-based redaction layer runs alongside the LLM pass to catch known patterns (SSNs, credit cards, API keys). Keyword density check across three FinOps vocabulary tiers. Binary PASS/FAIL — analysis is blocked before any costly downstream API calls.
+          DLP Officer LLM pass scans for PII, secrets, and irrelevant input — <strong>multimodal</strong>: the same pass inspects attached images for visible secrets (credentials in console screenshots, passwords on sticky notes, customer names in dashboard exports). A deterministic regex-based redaction layer runs alongside the LLM pass to catch known textual patterns (SSNs, credit cards, API keys). Keyword density check across three FinOps vocabulary tiers (bypassed when only image inputs are present — the LLM DLP carries the relevance check in that path). Binary PASS/FAIL — analysis is blocked before any costly downstream API calls.
         </div>
       </div>
 
@@ -980,7 +980,7 @@
           <div class="stage-meta">5 parallel AI calls · Gemini Flash · ~30–60s</div>
         </div>
         <div class="stage-body">
-          Five batches run simultaneously. Each batch evaluates 10 criteria (5 maturity + 5 anti-pattern). Each criterion has 3 sub-criteria. Evidence scale 0–3. Every captured evidence quote is also tagged with one of <strong>seven evidence categories</strong> (Policy / Process / Operational / Automation / Accountability / Financial-Integration / Cultural) — an orthogonal dimension to the 0–3 score.
+          Five batches run simultaneously. Each batch evaluates 10 criteria (5 maturity + 5 anti-pattern). Each criterion has 3 sub-criteria. Evidence scale 0–3. Every captured evidence quote is also tagged with one of <strong>seven evidence categories</strong> (Policy / Process / Operational / Automation / Accountability / Financial-Integration / Cultural) — an orthogonal dimension to the 0–3 score. <strong>Phase 1 is multimodal:</strong> alongside text, each batch receives any source images (PDF pages rendered as JPEGs, dashboard screenshots, org charts, architecture diagrams). Image-derived evidence carries an <code style="font-family: var(--mono); font-size: 12px;">evidence_source: 'image'</code> field plus the originating page number.
           <div class="batch-grid">
             <div class="batch-chip"><strong>Batch A</strong><span>Visibility &amp; Allocation</span></div>
             <div class="batch-chip"><strong>Batch B</strong><span>Rate &amp; Usage</span></div>
@@ -2122,6 +2122,18 @@ EVIDENCE CATEGORY (required on every captured quote):
   enforcement. Cultural supersedes Process when the quote describes a
   norm rather than a scheduled activity.
 
+IMAGE / VISUAL EVIDENCE:
+  Some submissions include images (PDF pages rendered as JPEG, dashboard
+  screenshots, architecture diagrams, org charts). Treat their visible
+  content as evidence on equal footing with text. For image-derived
+  evidence, the "quote" field is a SHORT DESCRIPTION of what is visible
+  ("Org chart showing FinOps function reporting to CFO" / "Cost Explorer
+  dashboard with per-team breakdown filter applied"), NOT a verbatim
+  quote. Set evidence_source: "image" and include page_number when known.
+  The 7-category taxonomy still applies — a dashboard screenshot
+  typically evidences Operational or Automation; an org chart with
+  named FinOps roles evidences Accountability.
+
 DOCUMENT-TYPE SIGNATURES — Honor Silence:
   Real source documents are often SINGLE-PURPOSE. A narrow document is
   EXPECTED to be silent on most criteria. Do not invent evidence to
@@ -2166,7 +2178,11 @@ OUTPUT RULES:
     <div class="section-tag"><span class="num">07</span><span>Input Document Guidance</span></div>
     <h2>What to Submit</h2>
     <p style="max-width: 760px; color: var(--ink-2);">
-      The assessment accepts any combination of documents. More document types provide richer signal across all five batches. <strong>Absence of entire document categories is itself a maturity indicator.</strong>
+      The assessment accepts any combination of documents — text, HTML, JSON, PDF, and <strong>images</strong> (PNG / JPEG / WebP). More document types provide richer signal across all five batches. <strong>Absence of entire document categories is itself a maturity indicator.</strong>
+    </p>
+
+    <p style="max-width: 760px; color: var(--ink-2); font-size: 14.5px; background: var(--paper-2); border-left: 3px solid var(--accent-2); padding: 12px 16px; border-radius: 6px;">
+      <strong>Multimodal:</strong> PDFs are rasterized page-by-page and the images are sent to Phase 1, the DLP pre-flight, and the fact-check pass alongside the extracted text. Standalone image uploads (architecture diagrams, organisation charts, dashboard screenshots) are first-class evidence sources. Image-derived findings carry an <code style="font-family: var(--mono); font-size: 12px;">evidence_source: 'image'</code> tag and the originating page number in the forensic audit.
     </p>
 
     <div class="tier t1">
@@ -2212,8 +2228,8 @@ OUTPUT RULES:
       Before Phase 1 begins, the pre-flight scanner validates:
     </p>
     <ol class="checklist">
-      <li><strong>Safety</strong> — no PII, credentials, or API keys in submitted documents.</li>
-      <li><strong>Relevance</strong> — sufficient FinOps-related keywords to indicate analyzable content.</li>
+      <li><strong>Safety</strong> — no PII, credentials, or API keys in submitted documents. For images, the DLP officer additionally inspects visible content for secrets in console screenshots, passwords on sticky notes, login screens, customer names in dashboard exports, and similar.</li>
+      <li><strong>Relevance</strong> — sufficient FinOps-related keywords to indicate analyzable content. When the submission is image-only, the textual keyword scan is bypassed and the LLM DLP carries the relevance check.</li>
       <li><strong>Structure</strong> — document has enough substance (word count minimum) for meaningful analysis.</li>
       <li><strong>Readiness Score</strong> — 0–100 indicating expected signal quality (based on keyword density and structural markers).</li>
     </ol>
