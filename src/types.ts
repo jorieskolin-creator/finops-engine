@@ -114,10 +114,22 @@ export type QualityGateDecision = 'GO' | 'WARN' | 'BLOCK';
 
 export type ClaimClassification = 'supported_by_source' | 'supported_by_audit' | 'unsupported';
 
+export type ClaimFailureType =
+  | 'fabricated_number'
+  | 'unverifiable_entity'
+  | 'unsupported_org_claim'
+  | 'out_of_scope'
+  | 'other';
+
+export type ClaimSourceLocation = PersonaId | 'roadmap';
+
 export interface FactCheckClaim {
   claim: string;
   classification: ClaimClassification;
   rationale: string;
+  failure_type?: ClaimFailureType;
+  missing_material?: string;
+  source_location?: ClaimSourceLocation;
 }
 
 export interface FactCheckResult {

@@ -472,6 +472,28 @@ const App: React.FC = () => {
                       ))}
                     </div>
                     <MarkdownRenderer content={result.phase_3_strategy.executive_summaries?.[activePersona] || result.phase_3_strategy.executive_summary} />
+                    {(() => {
+                      const claims = result.quality_gate?.fact_check?.unsupported_claims || [];
+                      const personaClaims = claims.filter(c => c.source_location === activePersona);
+                      if (personaClaims.length === 0) return null;
+                      return (
+                        <div className="mt-6 p-5 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                          <div className="flex items-center gap-2 mb-3">
+                            <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M4.93 19h14.14a2 2 0 001.74-3l-7.07-12a2 2 0 00-3.48 0L3.2 16a2 2 0 001.73 3z" /></svg>
+                            <span className="text-xs font-bold uppercase tracking-widest text-amber-300">Confidence Notes — Unverified Claims</span>
+                          </div>
+                          <p className="text-xs text-amber-100/80 mb-3">The following statements in this summary could not be verified against your source after {result.quality_gate?.fact_check?.attempts || 0} regenerate pass(es). Treat with caution.</p>
+                          <ul className="space-y-2">
+                            {personaClaims.map((c, i) => (
+                              <li key={i} className="text-sm text-amber-50">
+                                <span className="italic">&ldquo;{c.claim}&rdquo;</span>
+                                <span className="block text-xs text-amber-200/70 mt-0.5">{c.rationale}{c.failure_type ? ` · ${c.failure_type.replace(/_/g, ' ')}` : ''}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })()}
                   </div>
                   <TransferProtocol />
                   <div className="mt-12 flex flex-col md:flex-row justify-center items-center gap-6 w-full">
@@ -490,6 +512,43 @@ const App: React.FC = () => {
                 </div>
 
                 <QualityGateBanner gate={result.quality_gate} />
+
+                {(() => {
+                  const claims = result.quality_gate?.fact_check?.unsupported_claims || [];
+                  const withMaterial = claims.filter(c => c.missing_material);
+                  if (withMaterial.length === 0) return null;
+                  const byType: Record<string, string[]> = {};
+                  for (const c of withMaterial) {
+                    const key = c.failure_type ? c.failure_type.replace(/_/g, ' ') : 'other';
+                    (byType[key] ||= []).push(c.missing_material!);
+                  }
+                  return (
+                    <div className="glass-panel p-8 md:p-10 rounded-[2rem] bg-slate-900/40 border border-amber-500/20">
+                      <div className="flex items-start gap-4 mb-5">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold text-sm flex-shrink-0">!</div>
+                        <div>
+                          <h3 className="text-lg font-display font-bold text-white">Source Coverage Gaps</h3>
+                          <p className="text-xs text-slate-400 mt-1">To strengthen the next assessment cycle, include the following kinds of evidence in the source document.</p>
+                        </div>
+                      </div>
+                      <div className="space-y-4 pl-14">
+                        {Object.entries(byType).map(([type, materials]) => (
+                          <div key={type}>
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-300 mb-2">{type}</p>
+                            <ul className="space-y-1.5">
+                              {Array.from(new Set(materials)).map((m, i) => (
+                                <li key={i} className="flex items-start gap-2 text-sm text-slate-300">
+                                  <span className="mt-1.5 w-1 h-1 rounded-full bg-amber-400 shrink-0"></span>
+                                  <span>{m}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="md:col-span-2 md:row-span-2">
