@@ -110,13 +110,19 @@ const validateAndSanitizeLogs = (rawData: any): Phase1AuditLogs => {
 const calculateMetrics = (logs: Phase1AuditLogs): Phase2Validation => {
   let maturityCount = 0; let maturitySum = 0; const maturityGaps: string[] = [];
   let antipatternCount = 0; let antipatternSum = 0; const antipatternFindings: string[] = [];
-  let validItemsFound = 0;
+  let deliveredItems = 0;
+  let itemsWithEvidence = 0;
   const silentAreas: string[] = [];
   const categoryScores: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, E: 0 };
 
+  const tally = (item: AuditItem) => {
+    if (item.count !== -1) deliveredItems++;
+    if (item.evidence_quotes && item.evidence_quotes.length > 0) itemsWithEvidence++;
+  };
+
   Object.entries(logs.maturity).forEach(([key, rawItem]) => {
     const item = rawItem as AuditItem;
-    if (item.count !== -1) validItemsFound++;
+    tally(item);
     maturitySum += Math.max(item.count, 0);
     if (item.status === 'OK') maturityCount++;
     const catPrefix = key.charAt(0);
@@ -129,7 +135,7 @@ const calculateMetrics = (logs: Phase1AuditLogs): Phase2Validation => {
 
   Object.entries(logs.antipattern).forEach(([key, rawItem]) => {
     const item = rawItem as AuditItem;
-    if (item.count !== -1) validItemsFound++;
+    tally(item);
     antipatternSum += Math.max(item.count, 0);
     if (item.status === 'NOK') antipatternCount++;
     if (item.count > 0) {
@@ -137,8 +143,8 @@ const calculateMetrics = (logs: Phase1AuditLogs): Phase2Validation => {
     }
   });
 
-  const coverageRatio = validItemsFound / 50;
-  const signalStrength = Math.round(coverageRatio * 100);
+  const delivery_integrity = Math.round((deliveredItems / 50) * 100);
+  const evidence_density = Math.round((itemsWithEvidence / 50) * 100);
 
   const maturity_ratio = (maturityCount / 25) * 100;
   const maturity_depth = (maturitySum / 75) * 100;
@@ -162,7 +168,8 @@ const calculateMetrics = (logs: Phase1AuditLogs): Phase2Validation => {
       maturity_depth,
       antipattern_burden,
       finops_readiness,
-      signal_strength: signalStrength
+      delivery_integrity,
+      evidence_density
     },
     raw_counts: {
       maturity_sub_criteria_met: maturitySum,
@@ -176,7 +183,7 @@ const calculateMetrics = (logs: Phase1AuditLogs): Phase2Validation => {
   };
 };
 
-const SIGNAL_THRESHOLD = 85;
+const EVIDENCE_DENSITY_BLOCK_THRESHOLD = 30;
 
 export const analyzeDocument = async (
   text: string,
@@ -226,7 +233,7 @@ export const analyzeDocument = async (
 
     console.log(`[FinOps] Phase 2 Complete. Readiness: ${Math.round(validationData.metrics.finops_readiness)}%, Classification: ${validationData.crawl_walk_run}`);
 
-    if (validationData.metrics.signal_strength < SIGNAL_THRESHOLD) {
+    if (validationData.metrics.evidence_density < EVIDENCE_DENSITY_BLOCK_THRESHOLD) {
       onProgress('strategy', 100);
       return {
         meta: {
@@ -242,7 +249,7 @@ export const analyzeDocument = async (
         phase_1_audit_logs: auditLogs,
         phase_2_validation: validationData,
         phase_3_strategy: {
-          executive_summary: `**ANALYSIS ABORTED: LOW DATA INTEGRITY**\n\nSignal Strength ${Math.round(validationData.metrics.signal_strength)}% < ${SIGNAL_THRESHOLD}%. The AI could not verify enough FinOps criteria to form a safe strategy. Please provide more comprehensive FinOps-relevant documentation.`,
+          executive_summary: `**ANALYSIS ABORTED: INSUFFICIENT EVIDENCE**\n\nEvidence density ${validationData.metrics.evidence_density}% < ${EVIDENCE_DENSITY_BLOCK_THRESHOLD}% — fewer than ${Math.ceil(EVIDENCE_DENSITY_BLOCK_THRESHOLD / 2)} of 50 criteria had any quotable evidence in the source document. The audit cannot form a reliable strategy from this material. Please provide more comprehensive FinOps-relevant documentation.`,
           visual_scorecard: { headline: "Audit Inconclusive", maturity_score: "N/A", burden_score: "N/A" },
           remediation_roadmap: []
         }
@@ -264,7 +271,8 @@ FinOps Readiness Score: ${Math.round(validationData.metrics.finops_readiness)}/1
 Maturity Classification: ${validationData.crawl_walk_run}
 Maturity Depth Index: ${Math.round(validationData.metrics.maturity_depth)}%
 Anti-Pattern Burden: ${Math.round(validationData.metrics.antipattern_burden)}%
-Signal Strength: ${Math.round(validationData.metrics.signal_strength)}%
+Delivery Integrity: ${validationData.metrics.delivery_integrity}% (criteria the audit returned data for)
+Evidence Density: ${validationData.metrics.evidence_density}% (criteria with quotable evidence from source)
 Anti-Pattern Findings: ${validationData.antipattern_findings.length}
 Maturity Gaps: ${validationData.maturity_gaps.length}
 Silent Areas: ${validationData.silent_areas.length}

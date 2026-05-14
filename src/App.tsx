@@ -475,7 +475,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                <SignalWarningBanner strength={result.phase_2_validation.metrics.signal_strength} />
+                <SignalWarningBanner density={result.phase_2_validation.metrics.evidence_density} />
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                   <div className="md:col-span-2 md:row-span-2">

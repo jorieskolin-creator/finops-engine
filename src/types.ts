@@ -29,7 +29,8 @@ export interface Metrics {
   maturity_depth: number;
   antipattern_burden: number;
   finops_readiness: number;
-  signal_strength: number;
+  delivery_integrity: number;
+  evidence_density: number;
 }
 
 export interface RawCounts {

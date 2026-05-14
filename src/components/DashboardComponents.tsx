@@ -288,8 +288,8 @@ export const BenchmarkingChart: React.FC<BenchmarkingProps> = ({ x, y }) => {
   );
 };
 
-export const SignalWarningBanner: React.FC<{ strength: number }> = ({ strength }) => {
-  if (strength >= 75) return null;
+export const SignalWarningBanner: React.FC<{ density: number }> = ({ density }) => {
+  if (density >= 60) return null;
   return (
     <div className="glass-panel p-6 mb-8 flex items-start gap-5 border-l-4 border-l-rose-500 animate-fade-in bg-rose-950/10 backdrop-blur-md">
       <div className="p-3 rounded-full bg-rose-900/30 text-rose-400 shadow-inner flex-shrink-0 relative overflow-hidden border border-rose-500/20">
@@ -298,12 +298,12 @@ export const SignalWarningBanner: React.FC<{ strength: number }> = ({ strength }
       </div>
       <div>
         <h4 className="font-bold text-lg font-display mb-1 text-slate-100 flex items-center gap-2">
-          Signal Integrity Critical
-          <span className="text-[10px] font-mono font-bold bg-rose-900/40 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30 uppercase tracking-wide">{Math.round(strength)}% Integrity</span>
+          Low Evidence Density
+          <span className="text-[10px] font-mono font-bold bg-rose-900/40 text-rose-300 px-2 py-0.5 rounded-full border border-rose-500/30 uppercase tracking-wide">{density}% with quotes</span>
         </h4>
         <p className="text-sm text-slate-300 leading-relaxed max-w-3xl">
-          The forensic audit detected <strong className="text-rose-400">significant silence</strong> across critical FinOps vectors. The strategy engine has been throttled to prevent hallucination.
-          <span className="font-semibold text-slate-200 block mt-2">Required Action: Upload deeper FinOps documentation (cost policies, cloud governance, optimization reports).</span>
+          Fewer than <strong className="text-rose-400">60%</strong> of audited criteria had any quotable evidence in the source document. The strategy is grounded in mostly silent areas — treat its specificity with caution.
+          <span className="font-semibold text-slate-200 block mt-2">Suggested Action: Add deeper FinOps documentation (cost policies, cloud governance, optimization reports) and re-run.</span>
         </p>
       </div>
     </div>

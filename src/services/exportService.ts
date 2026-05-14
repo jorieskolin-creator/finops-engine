@@ -139,7 +139,8 @@ const generateReportHtml = (result: DiagnosticResult): string => {
     <div class="card"><div class="card-label">FinOps Readiness</div><div class="card-value positive">${Math.round(m.finops_readiness)}%</div></div>
     <div class="card"><div class="card-label">Maturity Depth</div><div class="card-value neutral">${Math.round(m.maturity_depth)}%</div></div>
     <div class="card"><div class="card-label">Anti-Pattern Burden</div><div class="card-value negative">${Math.round(m.antipattern_burden)}%</div></div>
-    <div class="card"><div class="card-label">Signal Strength</div><div class="card-value">${Math.round(m.signal_strength)}%</div></div>
+    <div class="card"><div class="card-label">Delivery Integrity</div><div class="card-value">${m.delivery_integrity}%</div></div>
+    <div class="card"><div class="card-label">Evidence Density</div><div class="card-value">${m.evidence_density}%</div></div>
   </div>
 
   <h2>Executive Summary</h2>

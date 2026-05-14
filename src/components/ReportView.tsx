@@ -162,7 +162,9 @@ export const ReportView: React.FC<ReportViewProps> = ({ result, onBack, onDownlo
               {cwrClass}
             </span>
             <span className="text-slate-400">|</span>
-            <span className="text-sm font-mono text-slate-500">Signal Strength: {Math.round(m.signal_strength)}%</span>
+            <span className="text-sm font-mono text-slate-500">
+              Delivery {m.delivery_integrity}% · Evidence {m.evidence_density}%
+            </span>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
