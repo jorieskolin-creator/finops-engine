@@ -504,10 +504,13 @@ const App: React.FC = () => {
             {!loading ? (
               <>
                 <div className="text-center mb-16 relative">
-                  <div className="mb-5 flex justify-center">
-                    <span className="inline-flex items-center gap-2 text-[10px] md:text-xs font-bold uppercase tracking-[0.3em] text-amber-300 bg-amber-500/10 border border-amber-400/40 px-4 py-1.5 rounded-full">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-                      DEMO
+                  <div className="mb-6 flex justify-center">
+                    <span className="relative inline-flex">
+                      <span className="absolute inset-0 rounded-full bg-amber-400/30 animate-ping"></span>
+                      <span className="relative inline-flex items-center gap-2.5 text-sm md:text-base font-bold uppercase tracking-[0.35em] text-amber-100 bg-amber-500/20 border border-amber-300/60 px-6 py-2.5 rounded-full shadow-[0_0_25px_rgba(251,191,36,0.35)] animate-pulse">
+                        <span className="w-2 h-2 rounded-full bg-amber-300 shadow-[0_0_8px_rgba(252,211,77,0.9)]"></span>
+                        DEMO
+                      </span>
                     </span>
                   </div>
                   <h2 className="text-6xl md:text-8xl font-display font-black text-white mb-6 tracking-tight leading-[0.9] drop-shadow-xl">
