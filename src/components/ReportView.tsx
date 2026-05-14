@@ -38,6 +38,21 @@ const QualityGateBlock: React.FC<{ gate: QualityGateResult }> = ({ gate }) => {
           </ul>
         </div>
       )}
+      {gate.fact_check && !gate.fact_check.failed && gate.fact_check.unsupported_claims.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-slate-300">
+          <p className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
+            Unverified claims ({gate.fact_check.unsupported_claims.length} survived {gate.fact_check.attempts} pass{gate.fact_check.attempts === 1 ? '' : 'es'})
+          </p>
+          <ul className="space-y-2 text-sm text-slate-700">
+            {gate.fact_check.unsupported_claims.map((c, i) => (
+              <li key={i} className="pl-3 border-l-2 border-slate-400">
+                <span className="italic">&ldquo;{c.claim}&rdquo;</span>
+                {c.rationale && <span className="block text-xs text-slate-500 mt-0.5">{c.rationale}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 };

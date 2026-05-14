@@ -26,6 +26,11 @@ const renderQualityGate = (gate: QualityGateResult): string => {
       <div class="gate-label">Warnings</div>
       <ul>${gate.warnings.map(w => `<li>${escapeHtml(w)}</li>`).join('')}</ul>
     </div>` : ''}
+    ${gate.fact_check && !gate.fact_check.failed && gate.fact_check.unsupported_claims.length > 0 ? `
+    <div class="gate-factcheck">
+      <div class="gate-label">Unverified claims (${gate.fact_check.unsupported_claims.length} survived ${gate.fact_check.attempts} pass${gate.fact_check.attempts === 1 ? '' : 'es'})</div>
+      <ul>${gate.fact_check.unsupported_claims.map(c => `<li><em>&ldquo;${escapeHtml(c.claim)}&rdquo;</em>${c.rationale ? `<span class="gate-rationale"> — ${escapeHtml(c.rationale)}</span>` : ''}</li>`).join('')}</ul>
+    </div>` : ''}
   </div>`;
 };
 
@@ -152,6 +157,8 @@ const generateReportHtml = (result: DiagnosticResult): string => {
     .gate-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700; margin: 0.75rem 0 0.5rem; opacity: 0.8; }
     .gate ul { list-style: none; padding: 0; margin: 0; }
     .gate li { padding-left: 0.75rem; border-left: 2px solid currentColor; margin: 0.4rem 0; opacity: 0.9; font-size: 0.875rem; }
+    .gate-factcheck { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.1); }
+    .gate-rationale { font-size: 0.75rem; opacity: 0.7; font-style: normal; }
     @media print { body { background: white; color: #1e293b; } .card, .summary, .roadmap-phase, .forensic-card { border-color: #e2e8f0; background: #f8fafc; color: #1e293b; } .forensic-head h4 { color: #0f172a; } .forensic-reasoning, .forensic-quotes li { color: #334155; } }
   </style>
 </head>

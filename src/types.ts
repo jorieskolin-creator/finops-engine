@@ -79,6 +79,23 @@ export interface AnalysisMeta {
 
 export type QualityGateDecision = 'GO' | 'WARN' | 'BLOCK';
 
+export type ClaimClassification = 'supported_by_source' | 'supported_by_audit' | 'unsupported';
+
+export interface FactCheckClaim {
+  claim: string;
+  classification: ClaimClassification;
+  rationale: string;
+}
+
+export interface FactCheckResult {
+  attempts: number;
+  total_claims: number;
+  supported_count: number;
+  unsupported_claims: FactCheckClaim[];
+  failed: boolean;
+  failure_reason?: string;
+}
+
 export interface QualityGateResult {
   decision: QualityGateDecision;
   blocking_reasons: string[];
@@ -88,7 +105,9 @@ export interface QualityGateResult {
     evidence_density_block: number;
     evidence_density_warn: number;
     silent_areas_warn: number;
+    unsupported_claims_block: number;
   };
+  fact_check?: FactCheckResult;
 }
 
 export interface DiagnosticResult {

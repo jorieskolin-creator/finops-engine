@@ -361,6 +361,21 @@ export const QualityGateBanner: React.FC<{ gate: QualityGateResult }> = ({ gate 
                   </ul>
                 </div>
               )}
+              {gate.fact_check && !gate.fact_check.failed && gate.fact_check.unsupported_claims.length > 0 && (
+                <div className="pt-3 border-t border-slate-700/50">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    Unverified claims ({gate.fact_check.unsupported_claims.length} survived {gate.fact_check.attempts} pass{gate.fact_check.attempts === 1 ? '' : 'es'})
+                  </p>
+                  <ul className="space-y-2">
+                    {gate.fact_check.unsupported_claims.map((c, i) => (
+                      <li key={i} className="text-slate-300 pl-3 border-l-2 border-slate-600">
+                        <span className="italic">&ldquo;{c.claim}&rdquo;</span>
+                        {c.rationale && <span className="block text-xs text-slate-500 mt-0.5">{c.rationale}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>
