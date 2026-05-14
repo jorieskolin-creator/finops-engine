@@ -29,6 +29,23 @@ You must evaluate **ALL 3 criteria** for every item to determine the final score
 For EVERY item with score > 0, you MUST include at least one direct quote from the source document as evidence.
 Wrap evidence in the "evidence_quotes" array with the actual text from the document.
 
+### EVIDENCE CATEGORY (REQUIRED ON EVERY QUOTE)
+Every evidence quote MUST be tagged with exactly ONE of these seven categories on the "category" field:
+
+*   **Policy** — Written rules, standards, or formal documents that DECLARE intent (e.g., tagging policy, cost governance charter).
+*   **Process** — Recurring human practices or workflows that are described as actually happening (e.g., monthly cost review meetings, quarterly architecture reviews).
+*   **Operational** — Day-to-day tactical activities and roles (e.g., a FinOps analyst rightsizes EC2 weekly).
+*   **Automation** — Code, scripts, or platform features that ENFORCE without human intervention (e.g., CI/CD blocks untagged resources, IaC policy-as-code).
+*   **Accountability** — Mechanisms that assign ownership and consequences (e.g., showback, chargeback, cost-as-KPI).
+*   **Financial-Integration** — Cost data wired into financial systems or business decisions (e.g., cloud spend reconciled with GL, unit-cost-per-transaction reported).
+*   **Cultural** — Beliefs, norms, and incentives that shape behavior (e.g., engineers cite cost in design docs, savings celebrated).
+
+**Tagging rules:**
+*   If a quote could fit multiple categories, pick the dominant one (the one the quote most directly evidences).
+*   Automation supersedes Policy when the quote describes enforcement, not just declaration.
+*   Cultural supersedes Process when the quote describes a norm or belief, not a scheduled activity.
+*   The "category" field is REQUIRED — never omit it, never use null, never use a value outside the seven above.
+
 ### JSON SAFETY PROTOCOL
 *   **NO DOUBLE QUOTES** inside JSON values. Use single quotes or asterisks.
 *   **NO MARKDOWN** formatting outside the JSON block.
@@ -72,7 +89,7 @@ For the 5 criteria in Stream A (${columnId}1-${columnId}5) AND the 5 criteria in
     "${columnId}1": {
       "count": 0,
       "evidence": "Summary of evidence...",
-      "evidence_quotes": [{ "quote": "Direct text from document", "section": "Section name if identifiable" }],
+      "evidence_quotes": [{ "quote": "Direct text from document", "section": "Section name if identifiable", "category": "Policy | Process | Operational | Automation | Accountability | Financial-Integration | Cultural" }],
       "reasoning": "Crit 1: Found. Crit 2: Not found. Crit 3: Not found. Total: 1."
     },
     ...

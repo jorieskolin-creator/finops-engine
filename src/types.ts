@@ -1,8 +1,28 @@
 
+export type EvidenceCategory =
+  | 'Policy'
+  | 'Process'
+  | 'Operational'
+  | 'Automation'
+  | 'Accountability'
+  | 'Financial-Integration'
+  | 'Cultural';
+
+export const EVIDENCE_CATEGORIES: EvidenceCategory[] = [
+  'Policy',
+  'Process',
+  'Operational',
+  'Automation',
+  'Accountability',
+  'Financial-Integration',
+  'Cultural'
+];
+
 export interface EvidenceQuote {
   quote: string;
   source_document?: string;
   section?: string;
+  category?: EvidenceCategory;
 }
 
 export interface AuditItem {
@@ -12,6 +32,7 @@ export interface AuditItem {
   evidence_quotes: EvidenceQuote[];
   reasoning?: string;
   is_silent?: boolean;
+  category_footprint?: Partial<Record<EvidenceCategory, number>>;
 }
 
 export interface AuditCategory {
@@ -45,6 +66,7 @@ export interface Phase2Validation {
   antipattern_findings: string[];
   silent_areas: string[];
   category_scores: Record<string, number>;
+  evidence_category_totals?: Partial<Record<EvidenceCategory, number>>;
   crawl_walk_run: 'Crawl' | 'Walk' | 'Walk with significant friction' | 'Run';
 }
 
@@ -59,11 +81,22 @@ export interface VisualScorecard {
   burden_score: string;
 }
 
+export type PersonaId = 'finops_lead' | 'cfo' | 'engineering_lead';
+
+export const PERSONA_IDS: PersonaId[] = ['finops_lead', 'cfo', 'engineering_lead'];
+
+export const PERSONA_LABELS: Record<PersonaId, string> = {
+  finops_lead: 'FinOps Lead',
+  cfo: 'CFO',
+  engineering_lead: 'Engineering Lead'
+};
+
 export interface Phase3Strategy {
   executive_summary: string;
+  executive_summaries: Record<PersonaId, string>;
+  active_persona: PersonaId;
   visual_scorecard: VisualScorecard;
   remediation_roadmap: RemediationStep[];
-  persona_lens?: string;
 }
 
 export interface AnalysisMeta {

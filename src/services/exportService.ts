@@ -150,8 +150,9 @@ const generateReportHtml = (result: DiagnosticResult): string => {
     .gauge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.25rem; margin: 1.5rem 0 2rem; align-items: stretch; }
     .gauge-grid > .gauge-large { grid-column: span 2; }
     .chart-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 1.25rem; }
-    .summary { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 2rem; line-height: 1.75; color: #334155; }
+    .summary { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 1rem; padding: 2rem; line-height: 1.75; color: #334155; margin-bottom: 1.5rem; }
     .summary strong { color: #0f172a; }
+    .persona-heading { font-size: 0.875rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: #047857; margin: 0.5rem 0 0.75rem 0; }
     .roadmap-phase { background: #ffffff; border: 1px solid #e2e8f0; border-left: 3px solid #10b981; padding: 1.25rem 1.5rem; margin: 1rem 0; border-radius: 0 0.75rem 0.75rem 0; }
     .roadmap-phase h3 { color: #0f172a; margin-bottom: 0.75rem; font-size: 1rem; }
     .roadmap-phase ul { list-style: none; padding: 0; margin: 0; }
@@ -254,7 +255,21 @@ const generateReportHtml = (result: DiagnosticResult): string => {
   </div>
 
   <h2>Executive Summary</h2>
-  <div class="summary">${result.phase_3_strategy.executive_summary.replace(/\n/g, '<br>')}</div>
+  ${(() => {
+    const summaries = result.phase_3_strategy.executive_summaries;
+    const personas: Array<{ id: 'finops_lead' | 'cfo' | 'engineering_lead'; label: string }> = [
+      { id: 'finops_lead', label: 'FinOps Lead' },
+      { id: 'cfo', label: 'CFO' },
+      { id: 'engineering_lead', label: 'Engineering Lead' }
+    ];
+    if (summaries && personas.some(p => summaries[p.id])) {
+      return personas.map(p => `
+        <h3 class="persona-heading">For the ${escapeHtml(p.label)}</h3>
+        <div class="summary">${(summaries[p.id] || '').replace(/\n/g, '<br>')}</div>
+      `).join('');
+    }
+    return `<div class="summary">${(result.phase_3_strategy.executive_summary || '').replace(/\n/g, '<br>')}</div>`;
+  })()}
 
   <h2>Remediation Roadmap</h2>
   ${result.phase_3_strategy.remediation_roadmap.map(step => `

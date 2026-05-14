@@ -5,7 +5,7 @@ import { extractTextFromPdf } from './services/pdfService';
 import { downloadReport } from './services/exportService';
 import { forensicSanitizeImport } from './services/securityService';
 import { PerformanceMonitor } from './services/debugService';
-import { DiagnosticResult, ScanResult } from './types';
+import { DiagnosticResult, ScanResult, PersonaId, PERSONA_IDS, PERSONA_LABELS } from './types';
 import { METRIC_DESCRIPTIONS } from './constants';
 import { GaugeCard, AuditGrid, StrategicRoadmap, ComparisonChart, ReferenceLibrary, QualityGateBanner, BenchmarkingChart, TransferProtocol, MarkdownRenderer, NeuralLoadingGrid } from './components/DashboardComponents';
 import { ReportView } from './components/ReportView';
@@ -80,6 +80,7 @@ const App: React.FC = () => {
   const [scanResult, setScanResult] = useState<ScanResult>({ score: 0, status: 'Insufficient', message: 'Waiting...', details: [], canRun: false });
   const [authenticated, setAuthenticated] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [activePersona, setActivePersona] = useState<PersonaId>('finops_lead');
   const pendingAnalyzeRef = useRef(false);
   const pendingDriftRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -458,7 +459,19 @@ const App: React.FC = () => {
                     </div>
                   </div>
                   <div className="pl-4 md:pl-20 border-l-2 border-emerald-500/20">
-                    <MarkdownRenderer content={result.phase_3_strategy.executive_summary} />
+                    <div className="mb-6 flex flex-wrap items-center gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mr-2">Persona Lens:</span>
+                      {PERSONA_IDS.map(p => (
+                        <button
+                          key={p}
+                          onClick={() => setActivePersona(p)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 ${activePersona === p ? 'bg-emerald-500 text-slate-900 shadow-[0_0_15px_rgba(16,185,129,0.4)]' : 'bg-white/5 text-slate-300 hover:bg-white/10 border border-white/10'}`}
+                        >
+                          {PERSONA_LABELS[p]}
+                        </button>
+                      ))}
+                    </div>
+                    <MarkdownRenderer content={result.phase_3_strategy.executive_summaries?.[activePersona] || result.phase_3_strategy.executive_summary} />
                   </div>
                   <TransferProtocol />
                   <div className="mt-12 flex flex-col md:flex-row justify-center items-center gap-6 w-full">

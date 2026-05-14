@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AuditItem, DiagnosticResult, QualityGateResult } from '../types';
+import { AuditItem, DiagnosticResult, QualityGateResult, PersonaId, PERSONA_LABELS } from '../types';
 import { MarkdownRenderer } from './DashboardComponents';
 import { BATCH_TITLES, MASTER_BINGO_FINOPS } from '../knowledge_base';
 import { METRIC_DESCRIPTIONS } from '../constants';
@@ -93,6 +93,18 @@ const ForensicCriterion: React.FC<{
         <p className="text-sm text-slate-700 whitespace-pre-line">{item.reasoning}</p>
       </div>
     )}
+    {item?.category_footprint && Object.keys(item.category_footprint).length > 0 && (
+      <div className="mb-3">
+        <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Evidence Categories</p>
+        <div className="flex flex-wrap gap-1.5">
+          {Object.entries(item.category_footprint).map(([cat, n]) => (
+            <span key={cat} className="px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+              {cat} <span className="text-slate-500">×{n}</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    )}
     {item?.evidence_quotes && item.evidence_quotes.length > 0 && (
       <div>
         <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Evidence</p>
@@ -100,7 +112,12 @@ const ForensicCriterion: React.FC<{
           {item.evidence_quotes.map((q, i) => (
             <li key={i} className="border-l-2 border-slate-300 pl-3 text-sm italic text-slate-600">
               &ldquo;{q.quote}&rdquo;
-              {q.section && <span className="text-xs text-slate-400 not-italic"> — {q.section}</span>}
+              {(q.section || q.category) && (
+                <span className="text-xs text-slate-400 not-italic">
+                  {q.section && <> — {q.section}</>}
+                  {q.category && <> · {q.category}</>}
+                </span>
+              )}
             </li>
           ))}
         </ul>
@@ -295,7 +312,23 @@ export const ReportView: React.FC<ReportViewProps> = ({ result, onBack, onDownlo
 
         <div className="mb-12">
           <h2 className="text-2xl font-display font-bold text-slate-900 mb-6 pb-3 border-b border-slate-200">Executive Summary</h2>
-          <MarkdownRenderer content={result.phase_3_strategy.executive_summary} textColor="text-slate-700" />
+          {(() => {
+            const summaries = result.phase_3_strategy.executive_summaries;
+            const ids: PersonaId[] = ['finops_lead', 'cfo', 'engineering_lead'];
+            if (summaries && ids.some(id => summaries[id])) {
+              return (
+                <div className="space-y-8">
+                  {ids.map(id => (
+                    <div key={id}>
+                      <h3 className="text-sm font-bold uppercase tracking-widest text-emerald-700 mb-3">For the {PERSONA_LABELS[id]}</h3>
+                      <MarkdownRenderer content={summaries[id]} textColor="text-slate-700" />
+                    </div>
+                  ))}
+                </div>
+              );
+            }
+            return <MarkdownRenderer content={result.phase_3_strategy.executive_summary} textColor="text-slate-700" />;
+          })()}
         </div>
 
         {result.phase_3_strategy.remediation_roadmap.length > 0 && (
