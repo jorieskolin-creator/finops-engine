@@ -27,7 +27,8 @@ const DRIFT_FIXTURES = [
   { name: 'golden-walk.txt', text: goldenWalk },
   { name: 'golden-run.txt', text: goldenRun },
 ];
-const DRIFT_LABEL = 'Drift Test — Combined Golden Fixtures';
+const DRIFT_LABEL = 'Click to Simulate — Combined Golden Fixtures';
+const DEMO_MODE = true;
 
 const TIER1_FIXTURES: Array<{ pack_id: string; name: string; label: string; text: string }> = [
   { pack_id: 'tier1-governance-policy', name: 'tier1-governance-policy.txt', label: 'Cloud Governance / FinOps Policy', text: tier1GovernancePolicy },
@@ -172,6 +173,11 @@ const App: React.FC = () => {
   }, [aggregatedText, aggregatedImages, files]);
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (DEMO_MODE) {
+      if (event.target) event.target.value = '';
+      setError('Demo mode is locked to the bundled simulation. Use Click to Simulate instead.');
+      return;
+    }
     if (!event.target.files) return;
     const newFiles = Array.from(event.target.files);
 
@@ -459,7 +465,7 @@ const App: React.FC = () => {
                 className="text-xs font-bold uppercase tracking-widest text-amber-300 hover:text-white bg-amber-950/30 hover:bg-amber-700/40 border border-amber-700/40 hover:border-amber-400 transition-colors px-4 py-2 rounded-lg"
                 title="Run the assessment against the bundled golden fixtures (crawl + walk + run combined)"
               >
-                Drift Test
+                Click to Simulate
               </button>
             )}
 
@@ -567,30 +573,30 @@ const App: React.FC = () => {
                         )}
                       </div>
                     ) : (
-                      <div onClick={() => fileInputRef.current?.click()} className="flex-1 flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-700/50 rounded-[2rem] bg-slate-900/30 py-16 hover:bg-slate-900/50 hover:scale-[1.01] transition-all duration-300 hover:border-emerald-500/30 group/drop cursor-pointer relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/0 via-emerald-500/0 to-emerald-500/5 opacity-0 group-hover/drop:opacity-100 transition-opacity duration-500 pointer-events-none"></div>
-                        <div className="w-24 h-24 rounded-full bg-slate-800/80 border-4 border-slate-700 flex items-center justify-center mb-6 shadow-xl shadow-black/20 group-hover/drop:scale-110 group-hover/drop:shadow-emerald-500/20 group-hover/drop:border-emerald-500/30 transition-all duration-300 z-10 relative">
-                          <div className="absolute inset-0 rounded-full border border-emerald-400 opacity-0 group-hover/drop:opacity-100 group-hover/drop:animate-ping"></div>
-                          <svg className="w-10 h-10 text-slate-400 group-hover/drop:text-emerald-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                      <div className="flex-1 flex flex-col items-center justify-center text-slate-500 border-2 border-dashed border-slate-700/50 rounded-[2rem] bg-slate-900/30 py-16 transition-all duration-300 group/drop cursor-not-allowed relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/0 via-amber-500/0 to-amber-500/5 opacity-100 transition-opacity duration-500 pointer-events-none"></div>
+                        <div className="w-24 h-24 rounded-full bg-slate-800/80 border-4 border-amber-700/40 flex items-center justify-center mb-6 shadow-xl shadow-black/20 transition-all duration-300 z-10 relative">
+                          <div className="absolute inset-0 rounded-full border border-amber-400/40"></div>
+                          <svg className="w-10 h-10 text-amber-300 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                         </div>
-                        <h3 className="text-xl font-display font-bold text-slate-200 mb-2 z-10 group-hover/drop:text-white transition-colors">Drop FinOps Artifacts</h3>
-                        <p className="text-sm font-medium text-slate-400 z-10 group-hover/drop:text-emerald-200/70 transition-colors text-center max-w-md">
-                          Upload Cloud Cost Reports, FinOps Policies, Optimization Plans, Governance Docs, Architecture Reviews.<br />
-                          <span className="text-xs opacity-70 mt-1 block">25MB max., 2-12 artifacts. Supports PDF (Analysis) or HTML/JSON (Session Restore)</span>
+                        <h3 className="text-xl font-display font-bold text-slate-200 mb-2 z-10 transition-colors">Demo Mode Locked</h3>
+                        <p className="text-sm font-medium text-slate-400 z-10 transition-colors text-center max-w-md">
+                          Adding input material is disabled for this demo version.<br />
+                          <span className="text-xs opacity-70 mt-1 block">Use the header action to run the bundled FinOps simulation.</span>
                         </p>
                       </div>
                     )}
                   </div>
 
                   <div className="flex justify-between items-center px-10 py-6 bg-slate-900/60 backdrop-blur-xl relative z-10 border-t border-white/5">
-                    <button onClick={() => fileInputRef.current?.click()} disabled={files.length >= MAX_FILES} className="text-sm font-bold text-slate-400 hover:text-white transition-colors flex items-center gap-2 hover:bg-white/5 px-4 py-2 rounded-lg">
+                    <button disabled className="text-sm font-bold text-slate-600 transition-colors flex items-center gap-2 px-4 py-2 rounded-lg cursor-not-allowed opacity-60">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                      Add PDF or HTML
+                      Adding material disabled
                     </button>
-                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept=".pdf,.html,.json,.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" multiple />
+                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept=".pdf,.html,.json,.png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp" multiple disabled />
                     <button onClick={handleAnalyze} disabled={!scanResult.canRun || files.length < MIN_FILES || files.length > MAX_FILES} className={`px-8 py-4 rounded-xl font-bold shadow-2xl transition-all transform active:scale-[0.98] flex items-center gap-3 border ${!scanResult.canRun || files.length < MIN_FILES || files.length > MAX_FILES ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-not-allowed shadow-none' : 'text-slate-900 bg-white border-white hover:bg-emerald-400 hover:border-emerald-400 hover:shadow-[0_0_30px_rgba(16,185,129,0.4)]'}`}>
                       {!scanResult.canRun || files.length < MIN_FILES || files.length > MAX_FILES ? (
-                        <span>{files.length < MIN_FILES ? `Add ${MIN_FILES - files.length} more files` : files.length > MAX_FILES ? "Limit Exceeded" : "Checks Failed"}</span>
+                        <span>{DEMO_MODE ? 'Simulation only' : files.length < MIN_FILES ? `Add ${MIN_FILES - files.length} more files` : files.length > MAX_FILES ? "Limit Exceeded" : "Checks Failed"}</span>
                       ) : (
                         <>
                           <span>Run FinOps Assessment</span>
